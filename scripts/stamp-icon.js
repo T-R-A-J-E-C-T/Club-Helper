@@ -1,5 +1,5 @@
 const { execFileSync } = require('node:child_process')
-const { existsSync, readdirSync } = require('node:fs')
+const { existsSync } = require('node:fs')
 const path = require('node:path')
 
 const rcedit = path.join('node_modules', 'electron-winstaller', 'vendor', 'rcedit.exe')
