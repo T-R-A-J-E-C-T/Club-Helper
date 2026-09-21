@@ -4,16 +4,10 @@ const path = require('node:path')
 
 const rcedit = path.join('node_modules', 'electron-winstaller', 'vendor', 'rcedit.exe')
 const icon = path.join('build', 'icon.ico')
-const files = process.argv.slice(2)
-
+const files = process.argv.slice(2).filter((file) => existsSync(file))
 if (!files.length) {
-  const unpacked = path.join('dist', 'win-unpacked', 'TrajectClubHelper.exe')
-  if (existsSync(unpacked)) files.push(unpacked)
-  if (existsSync('dist')) {
-    for (const name of readdirSync('dist')) {
-      if (name.endsWith('.exe')) files.push(path.join('dist', name))
-    }
-  }
+  console.error('stamp-icon: укажите exe внутри win-unpacked, не готовый установщик')
+  process.exit(1)
 }
 
 for (const file of files) {

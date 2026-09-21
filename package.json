@@ -1,6 +1,6 @@
 {
   "name": "traject-club-helper",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Диагностический лаунчер для компьютерного клуба Traject",
   "main": "./out/main/index.js",
   "author": "Traject",
@@ -19,7 +19,7 @@
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win dir --publish never && node scripts/stamp-icon.js dist/win-unpacked/TrajectClubHelper.exe && electron-builder --win nsis portable --prepackaged dist/win-unpacked --publish never && node scripts/stamp-icon.js"
+    "build:win": "npm run build && electron-builder --win dir --publish never && node scripts/stamp-icon.js dist/win-unpacked/TrajectClubHelper.exe && electron-builder --win nsis portable --prepackaged dist/win-unpacked --publish never"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
