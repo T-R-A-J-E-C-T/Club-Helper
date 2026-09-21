@@ -463,19 +463,28 @@ foreach ($monitor in $settled) {
       $colorOk = $true
       if (& $supports '08') {
         $colorOk = Write-Vcp $handle 0x08 1
-        Start-Sleep -Milliseconds 250
+        Start-Sleep -Milliseconds 1200
       }
       $fps = Get-FpsCode $caps
       if ($null -eq $fps -and ($caps -eq '' -or (& $supports 'DC'))) { $fps = 4 }
       $fpsOk = $false
+      $level = 100
       if ($null -ne $fps) {
         $fpsOk = Write-Vcp $handle 0xDC ([uint32]$fps)
-        Start-Sleep -Milliseconds 350
+        Start-Sleep -Milliseconds 500
       }
-      $level = 100
       $brightOk = Write-Vcp $handle 0x10 ([uint32]$level)
       $contrastOk = Write-Vcp $handle 0x12 ([uint32]$level)
-      Start-Sleep -Milliseconds 150
+      Start-Sleep -Milliseconds 250
+      if ($null -ne $fps) {
+        $now = Read-Vcp $handle 0xDC
+        if (-not $fpsOk -or -not $now -or $now.current -ne $fps) {
+          $fpsOk = Write-Vcp $handle 0xDC ([uint32]$fps)
+          Start-Sleep -Milliseconds 400
+          $brightOk = Write-Vcp $handle 0x10 ([uint32]$level)
+          $contrastOk = Write-Vcp $handle 0x12 ([uint32]$level)
+        }
+      }
       $steps += @{ label = 'Сброс цвета'; ok = [bool]$colorOk }
       $steps += @{ label = 'GameVisual FPS'; ok = [bool]$fpsOk }
       $steps += @{ label = 'Яркость 100'; ok = [bool]$brightOk }
