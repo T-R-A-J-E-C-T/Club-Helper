@@ -18,11 +18,17 @@ public static class MonCal {
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
     public string szDevice;
   }
-  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
   public struct PHYSICAL_MONITOR {
     public IntPtr hPhysicalMonitor;
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
     public string szPhysicalMonitorDescription;
+  }
+  public class PhysBag {
+    public IntPtr Handle;
+    public string Description = "";
+    public PHYSICAL_MONITOR[] Items;
+    public int Count;
   }
   [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
   public struct DEVMODE {
@@ -81,6 +87,50 @@ public static class MonCal {
   public static extern bool GetCapabilitiesStringLength(IntPtr handle, out uint length);
   [DllImport("dxva2.dll", SetLastError = true, CharSet = CharSet.Ansi)]
   public static extern bool CapabilitiesRequestAndCapabilitiesReply(IntPtr handle, StringBuilder caps, uint length);
+  [DllImport("dxva2.dll", SetLastError = true)]
+  public static extern bool GetMonitorBrightness(IntPtr handle, out uint min, out uint current, out uint max);
+  [DllImport("dxva2.dll", SetLastError = true)]
+  public static extern bool GetMonitorContrast(IntPtr handle, out uint min, out uint current, out uint max);
+  public static PhysBag TakePhysical(IntPtr hMonitor) {
+    var bag = new PhysBag();
+    uint count;
+    if (!GetNumberOfPhysicalMonitorsFromHMONITOR(hMonitor, out count) || count < 1 || count > 16) return bag;
+    var items = new PHYSICAL_MONITOR[count];
+    if (!GetPhysicalMonitorsFromHMONITOR(hMonitor, count, items)) return bag;
+    bag.Items = items;
+    bag.Description = items[0].szPhysicalMonitorDescription ?? "";
+    for (int i = 0; i < items.Length; i++) {
+      if (items[i].hPhysicalMonitor == IntPtr.Zero) continue;
+      bag.Handle = items[i].hPhysicalMonitor;
+      bag.Count++;
+    }
+    return bag;
+  }
+  public static void Release(PhysBag bag) {
+    if (bag == null || bag.Items == null || bag.Items.Length == 0 || bag.Handle == IntPtr.Zero) return;
+    try { DestroyPhysicalMonitors((uint)bag.Items.Length, bag.Items); } catch { }
+    bag.Items = null;
+    bag.Handle = IntPtr.Zero;
+    bag.Count = 0;
+  }
+  public static bool TryLevel(IntPtr handle, byte code, out int current) {
+    current = 0;
+    if (handle == IntPtr.Zero) return false;
+    uint type, cur, max, min;
+    if (GetVCPFeatureAndVCPFeatureReply(handle, code, out type, out cur, out max)) {
+      current = (int)cur;
+      return true;
+    }
+    if (code == 0x10 && GetMonitorBrightness(handle, out min, out cur, out max)) {
+      current = (int)cur;
+      return true;
+    }
+    if (code == 0x12 && GetMonitorContrast(handle, out min, out cur, out max)) {
+      current = (int)cur;
+      return true;
+    }
+    return false;
+  }
   [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
   public struct DISPLAY_DEVICE {
     public int cb;
@@ -171,10 +221,10 @@ public static class MonCal {
 "@
 
 function Read-Vcp([IntPtr]$handle, [byte]$code) {
-  $type = 0; $current = 0; $max = 0
-  $ok = [MonCal]::GetVCPFeatureAndVCPFeatureReply($handle, $code, [ref]$type, [ref]$current, [ref]$max)
+  $current = 0
+  $ok = [MonCal]::TryLevel($handle, $code, [ref]$current)
   if (-not $ok) { return $null }
-  return @{ current = [int]$current; max = [int]$max }
+  return @{ current = [int]$current; max = 100 }
 }
 
 function Write-Vcp([IntPtr]$handle, [byte]$code, [uint32]$value) {
@@ -306,33 +356,81 @@ function Disable-Hdr([string]$device) {
   return $changed
 }
 
+function Get-MonitorKey([string]$device) {
+  $adapter = New-Object MonCal+DISPLAY_DEVICE
+  $adapter.cb = [Runtime.InteropServices.Marshal]::SizeOf($adapter)
+  if (-not [MonCal]::EnumDisplayDevices($device, 0, [ref]$adapter, 0)) { return $null }
+  if ($adapter.DeviceID -match 'MONITOR\\([^\\]+)\\') { return $Matches[1].ToUpper() }
+  return $null
+}
+
+function Get-WmiBrightnessMap {
+  $map = @{}
+  Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorBrightness -ErrorAction SilentlyContinue | ForEach-Object {
+    $instance = [string]$_.InstanceName
+    if ($instance -match 'DISPLAY\\([^\\]+)\\') { $map[$Matches[1].ToUpper()] = [int]$_.CurrentBrightness }
+  }
+  return $map
+}
+
+function Find-Monitors {
+  $script:seenDevice = @{}
+  $script:foundList = New-Object System.Collections.Generic.List[object]
+  $callback = [MonCal+MonitorEnumProc]{
+    param($hMonitor, $hdc, $lprc, $data)
+    $info = New-Object MonCal+MONITORINFOEX
+    $info.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($info)
+    [void][MonCal]::GetMonitorInfo($hMonitor, [ref]$info)
+    $deviceKey = [string]$info.szDevice
+    if (-not $deviceKey -or $script:seenDevice.ContainsKey($deviceKey)) { return $true }
+    $script:seenDevice[$deviceKey] = $true
+    $bag = [MonCal]::TakePhysical($hMonitor)
+    [void]$script:foundList.Add([pscustomobject]@{ device = $deviceKey; bag = $bag })
+    return $true
+  }
+  [void][MonCal]::EnumDisplayMonitors([IntPtr]::Zero, [IntPtr]::Zero, $callback, [IntPtr]::Zero)
+}
+
+function Release-Found($found) {
+  if ($null -eq $found) { return }
+  foreach ($monitor in $found) {
+    if ($null -ne $monitor.bag) { [void][MonCal]::Release($monitor.bag) }
+  }
+}
+
+function Monitor-HasLevels($found) {
+  if ($null -eq $found) { return $false }
+  foreach ($monitor in $found) {
+    if ($null -eq $monitor.bag) { continue }
+    $handle = [IntPtr]$monitor.bag.Handle
+    if ([int64]$handle -eq 0) { continue }
+    if (Read-Vcp $handle 0x10) { return $true }
+    if (Read-Vcp $handle 0x12) { return $true }
+  }
+  return $false
+}
+
 $script:hdrOff = @()
 try { $script:hdrOff = @(Disable-Hdr '') } catch { $script:hdrOff = @() }
-if ($script:hdrOff.Count -gt 0) { Start-Sleep -Milliseconds 700 }
 
-$script:found = @()
-$script:seenDevice = @{}
-$callback = [MonCal+MonitorEnumProc]{
-  param($hMonitor, $hdc, $lprc, $data)
-  $info = New-Object MonCal+MONITORINFOEX
-  $info.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($info)
-  [void][MonCal]::GetMonitorInfo($hMonitor, [ref]$info)
-  $deviceKey = [string]$info.szDevice
-  if (-not $deviceKey -or $script:seenDevice.ContainsKey($deviceKey)) { return $true }
-  $script:seenDevice[$deviceKey] = $true
-  $count = 0
-  $physical = @()
-  if ([MonCal]::GetNumberOfPhysicalMonitorsFromHMONITOR($hMonitor, [ref]$count) -and $count -gt 0) {
-    $physical = New-Object MonCal+PHYSICAL_MONITOR[] ([int]$count)
-    [void][MonCal]::GetPhysicalMonitorsFromHMONITOR($hMonitor, $count, $physical)
+$settled = @()
+for ($try = 0; $try -lt 10; $try++) {
+  if ($try -gt 0) { Start-Sleep -Milliseconds 500 }
+  Find-Monitors
+  $found = $script:foundList
+  if ($null -eq $found -or $found.Count -eq 0) { continue }
+  $ready = Monitor-HasLevels $found
+  if ($ready -or $try -eq 9) {
+    Release-Found $settled
+    $settled = $found
+    break
   }
-  $script:found += @{ device = $deviceKey; handle = $hMonitor; physical = $physical; count = [int]$count }
-  return $true
+  Release-Found $found
 }
-[void][MonCal]::EnumDisplayMonitors([IntPtr]::Zero, [IntPtr]::Zero, $callback, [IntPtr]::Zero)
 
+$wmiBrightness = Get-WmiBrightnessMap
 $items = @()
-foreach ($monitor in $script:found) {
+foreach ($monitor in $settled) {
   $refresh = Get-Refresh $monitor.device ($action -eq 'calibrate')
   $name = Get-PanelName $monitor.device
   if ([string]::IsNullOrWhiteSpace($name)) { $name = $monitor.device }
@@ -342,12 +440,11 @@ foreach ($monitor in $script:found) {
   $note = $null
   $pictureOk = $false
   $handle = [IntPtr]::Zero
-  if ($monitor.count -gt 0) {
-    $handle = $monitor.physical[0].hPhysicalMonitor
-    if ($name -eq $monitor.device) {
-      $fallback = $monitor.physical[0].szPhysicalMonitorDescription
-      if (-not [string]::IsNullOrWhiteSpace($fallback)) { $name = $fallback }
-    }
+  if ($null -ne $monitor.bag -and [int64]$monitor.bag.Handle -ne 0) {
+    $handle = [IntPtr]$monitor.bag.Handle
+  }
+  if ($name -eq $monitor.device -and $monitor.bag -and -not [string]::IsNullOrWhiteSpace($monitor.bag.Description)) {
+    $name = $monitor.bag.Description
   }
 
   if ($action -eq 'calibrate' -and ($script:hdrOff -contains $monitor.device)) {
@@ -392,15 +489,20 @@ foreach ($monitor in $script:found) {
     $c = Read-Vcp $handle 0x12
     if ($b) { $brightness = $b.current }
     if ($c) { $contrast = $c.current }
-    if ($action -eq 'list' -and -not $b -and -not $c) { $note = 'Монитор не отвечает по DDC/CI' }
   } elseif ($action -eq 'calibrate') {
     $note = 'Нет доступа к настройкам картинки'
     $steps += @{ label = 'Картинка'; ok = $false }
   }
 
-  if ($monitor.count -gt 0) {
-    [void][MonCal]::DestroyPhysicalMonitors([uint32]$monitor.count, $monitor.physical)
+  if ($null -eq $brightness) {
+    $key = Get-MonitorKey $monitor.device
+    if ($key -and $wmiBrightness.ContainsKey($key)) { $brightness = $wmiBrightness[$key] }
   }
+  if ($action -eq 'list' -and $null -eq $brightness -and $null -eq $contrast) {
+    $note = $(if ([int64]$handle -eq 0) { 'Нет доступа к настройкам картинки' } else { 'Монитор не отвечает по DDC/CI' })
+  }
+
+  if ($null -ne $monitor.bag) { [void][MonCal]::Release($monitor.bag) }
 
   $items += [pscustomobject]@{
     name = $name

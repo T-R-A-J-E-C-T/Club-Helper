@@ -23,7 +23,7 @@ function run(action: Action): Promise<MonitorView[]> {
     const timer = setTimeout(() => {
       child.kill()
       reject(new Error('Монитор не ответил'))
-    }, 25000)
+    }, 45000)
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => {
