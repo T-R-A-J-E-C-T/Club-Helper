@@ -266,14 +266,14 @@ function Get-PanelName([string]$device) {
 }
 
 function Disable-Hdr([string]$device) {
-  $result = @{ relevant = $false; ok = $true; changed = $false }
+  $changed = New-Object System.Collections.Generic.List[string]
   $pathCount = [uint32]0
   $modeCount = [uint32]0
-  if ([MonCal]::GetDisplayConfigBufferSizes(2, [ref]$pathCount, [ref]$modeCount) -ne 0 -or $pathCount -lt 1) { return $result }
+  if ([MonCal]::GetDisplayConfigBufferSizes(2, [ref]$pathCount, [ref]$modeCount) -ne 0 -or $pathCount -lt 1) { return $changed }
   $paths = New-Object MonCal+PATH_INFO[] ([int]$pathCount)
   $modes = New-Object MonCal+MODE_INFO[] ([int]$modeCount)
-  if ([MonCal]::QueryDisplayConfig(2, [ref]$pathCount, $paths, [ref]$modeCount, $modes, [IntPtr]::Zero) -ne 0) { return $result }
-  $wanted = $device.Trim()
+  if ([MonCal]::QueryDisplayConfig(2, [ref]$pathCount, $paths, [ref]$modeCount, $modes, [IntPtr]::Zero) -ne 0) { return $changed }
+  $wanted = if ([string]::IsNullOrWhiteSpace($device)) { '' } else { $device.Trim() }
   for ($i = 0; $i -lt [int]$pathCount; $i++) {
     $nameHeader = New-Object MonCal+DEVICE_HEADER
     $nameHeader.type = [uint32]1
@@ -283,7 +283,7 @@ function Disable-Hdr([string]$device) {
     $source = New-Object MonCal+SOURCE_NAME
     $source.header = $nameHeader
     if ([MonCal]::DisplayConfigGetDeviceInfo([ref]$source) -ne 0) { continue }
-    if ($source.viewGdiDeviceName -ne $wanted) { continue }
+    if ($wanted -and $source.viewGdiDeviceName -ne $wanted) { continue }
     $colorHeader = New-Object MonCal+DEVICE_HEADER
     $colorHeader.type = [uint32]9
     $colorHeader.size = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][MonCal+COLOR_INFO])
@@ -293,7 +293,6 @@ function Disable-Hdr([string]$device) {
     $color.header = $colorHeader
     if ([MonCal]::DisplayConfigGetDeviceInfo([ref]$color) -ne 0) { continue }
     if (($color.value -band 2) -eq 0) { continue }
-    $result.relevant = $true
     $setHeader = New-Object MonCal+DEVICE_HEADER
     $setHeader.type = [uint32]10
     $setHeader.size = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][MonCal+SET_COLOR])
@@ -302,10 +301,14 @@ function Disable-Hdr([string]$device) {
     $set = New-Object MonCal+SET_COLOR
     $set.header = $setHeader
     $set.enableAdvancedColor = [uint32]0
-    if ([MonCal]::DisplayConfigSetDeviceInfo([ref]$set) -eq 0) { $result.changed = $true } else { $result.ok = $false }
+    if ([MonCal]::DisplayConfigSetDeviceInfo([ref]$set) -eq 0) { [void]$changed.Add($source.viewGdiDeviceName) }
   }
-  return $result
+  return $changed
 }
+
+$script:hdrOff = @()
+try { $script:hdrOff = @(Disable-Hdr '') } catch { $script:hdrOff = @() }
+if ($script:hdrOff.Count -gt 0) { Start-Sleep -Milliseconds 700 }
 
 $script:found = @()
 $script:seenDevice = @{}
@@ -330,11 +333,6 @@ $callback = [MonCal+MonitorEnumProc]{
 
 $items = @()
 foreach ($monitor in $script:found) {
-  $hdr = @{ relevant = $false; ok = $true; changed = $false }
-  if ($action -eq 'calibrate') {
-    try { $hdr = Disable-Hdr $monitor.device } catch { $hdr = @{ relevant = $false; ok = $true; changed = $false } }
-    if ($hdr.changed) { Start-Sleep -Milliseconds 400 }
-  }
   $refresh = Get-Refresh $monitor.device ($action -eq 'calibrate')
   $name = Get-PanelName $monitor.device
   if ([string]::IsNullOrWhiteSpace($name)) { $name = $monitor.device }
@@ -352,8 +350,8 @@ foreach ($monitor in $script:found) {
     }
   }
 
-  if ($action -eq 'calibrate' -and $hdr.relevant) {
-    $steps += @{ label = 'HDR выключен'; ok = [bool]$hdr.ok }
+  if ($action -eq 'calibrate' -and ($script:hdrOff -contains $monitor.device)) {
+    $steps += @{ label = 'HDR выключен'; ok = $true }
   }
   if ($action -eq 'calibrate' -and $refresh.max) {
     $steps += @{ label = "$($refresh.max) Гц"; ok = [bool]$refresh.applied }
