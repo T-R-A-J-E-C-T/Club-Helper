@@ -240,14 +240,59 @@ function Get-Caps([IntPtr]$handle) {
   return $builder.ToString()
 }
 
-function Get-FpsCode([string]$caps) {
-  if ($caps -match 'DC\(([^)]*)\)') {
-    $vals = @([regex]::Matches($Matches[1], '[0-9A-Fa-f]+') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) })
-    if ($vals.Count -ge 5) { return [int]$vals[4] }
-    if ($vals -contains 4) { return 4 }
+function Get-DcValues([string]$caps) {
+  if ($caps -notmatch '(?i)DC\(([^)]*)\)') { return @() }
+  $inside = $Matches[1]
+  return @([regex]::Matches($inside, '[0-9A-Fa-f]{1,2}') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) })
+}
+
+function Get-FpsFromRace([int]$race, $vals) {
+  $list = @($vals)
+  if ($list.Count -ge 5) {
+    $idx = [array]::IndexOf([int[]]$list, $race)
+    # Menu: Scenery, Racing, Cinema, RTS/RPG, FPS. FPS is three slots after Racing.
+    if ($idx -ge 0 -and ($idx + 3) -lt $list.Count) { return [int]$list[$idx + 3] }
   }
-  if ($caps -match '(^|[^0-9A-Fa-f])DC([^0-9A-Fa-f]|$)') { return 4 }
-  return $null
+  if ($race -eq 4) { return 7 }
+  return 4
+}
+
+function Wait-PictureStable([IntPtr]$handle) {
+  $prev = $null
+  $same = 0
+  for ($i = 0; $i -lt 12; $i++) {
+    Start-Sleep -Milliseconds 400
+    $now = Read-Vcp $handle 0xDC
+    $cur = if ($now) { [int]$now.current } else { $null }
+    if ($null -ne $cur -and $null -ne $prev -and $cur -eq $prev) {
+      $same++
+      if ($same -ge 2) { return $cur }
+    } else {
+      $same = 0
+    }
+    $prev = $cur
+  }
+  return $prev
+}
+
+function Set-FpsFirm([IntPtr]$handle, [int]$fps) {
+  $stuck = 0
+  $ok = $false
+  $saw = $false
+  for ($i = 0; $i -lt 8; $i++) {
+    if (Write-Vcp $handle 0xDC ([uint32]$fps)) { $ok = $true }
+    Start-Sleep -Milliseconds 350
+    $now = Read-Vcp $handle 0xDC
+    if ($now) { $saw = $true }
+    if ($now -and [int]$now.current -eq $fps) {
+      $stuck++
+      if ($stuck -ge 2) { return $true }
+    } else {
+      $stuck = 0
+    }
+  }
+  if (-not $saw) { return $ok }
+  return $false
 }
 
 function Get-Refresh([string]$device, [bool]$apply) {
@@ -286,6 +331,7 @@ function Get-Refresh([string]$device, [bool]$apply) {
     width = [int]$current.dmPelsWidth
     height = [int]$current.dmPelsHeight
     applied = $atMax -or $changed
+    changed = $changed
   }
 }
 
@@ -460,30 +506,25 @@ foreach ($monitor in $settled) {
     $supports = { param($code) $caps -match "(^|[^0-9A-Fa-f])$code([^0-9A-Fa-f]|$)" }
 
     if ($action -eq 'calibrate') {
+      if ($refresh.changed) { Start-Sleep -Milliseconds 1500 }
       $colorOk = $true
+      $race = $null
       if (& $supports '08') {
         $colorOk = Write-Vcp $handle 0x08 1
-        Start-Sleep -Milliseconds 1200
+        $race = Wait-PictureStable $handle
       }
-      $fps = Get-FpsCode $caps
-      if ($null -eq $fps -and ($caps -eq '' -or (& $supports 'DC'))) { $fps = 4 }
-      $fpsOk = $false
+      $fps = 4
+      if ($null -ne $race) { $fps = Get-FpsFromRace ([int]$race) (Get-DcValues $caps) }
       $level = 100
-      if ($null -ne $fps) {
-        $fpsOk = Write-Vcp $handle 0xDC ([uint32]$fps)
-        Start-Sleep -Milliseconds 500
-      }
+      $fpsOk = Set-FpsFirm $handle $fps
       $brightOk = Write-Vcp $handle 0x10 ([uint32]$level)
       $contrastOk = Write-Vcp $handle 0x12 ([uint32]$level)
-      Start-Sleep -Milliseconds 250
-      if ($null -ne $fps) {
-        $now = Read-Vcp $handle 0xDC
-        if (-not $fpsOk -or -not $now -or $now.current -ne $fps) {
-          $fpsOk = Write-Vcp $handle 0xDC ([uint32]$fps)
-          Start-Sleep -Milliseconds 400
-          $brightOk = Write-Vcp $handle 0x10 ([uint32]$level)
-          $contrastOk = Write-Vcp $handle 0x12 ([uint32]$level)
-        }
+      Start-Sleep -Milliseconds 300
+      $now = Read-Vcp $handle 0xDC
+      if (-not $now -or [int]$now.current -ne $fps) {
+        $fpsOk = Set-FpsFirm $handle $fps
+        $brightOk = Write-Vcp $handle 0x10 ([uint32]$level)
+        $contrastOk = Write-Vcp $handle 0x12 ([uint32]$level)
       }
       $steps += @{ label = 'Сброс цвета'; ok = [bool]$colorOk }
       $steps += @{ label = 'GameVisual FPS'; ok = [bool]$fpsOk }
