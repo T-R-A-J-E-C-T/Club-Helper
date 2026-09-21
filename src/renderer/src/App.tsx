@@ -10,6 +10,7 @@ import { NetworkScreen } from '@renderer/screens/Network'
 import { PingScreen } from '@renderer/screens/Ping'
 import { AudioScreen } from '@renderer/screens/Audio'
 import { SystemScreen } from '@renderer/screens/System'
+import { DisplayScreen } from '@renderer/screens/Display'
 import { ZapretScreen } from '@renderer/screens/Zapret'
 
 const BOOT_MIN_MS = 520
@@ -97,6 +98,9 @@ function Shell(): React.JSX.Element {
         </Pane>
         <Pane show={tab === 'system'}>
           <SystemScreen />
+        </Pane>
+        <Pane show={tab === 'display'}>
+          <DisplayScreen />
         </Pane>
         <Pane show={tab === 'zapret'}>
           <ZapretScreen />

@@ -6,6 +6,7 @@ import icon from '../../resources/icon.ico?asset'
 import type { PingTarget } from '@shared/types'
 import { getNetworkInfo, getSystemInfo, getSystemLive, pingMany, pingTarget, runSpeedTest } from './diagnostics'
 import { downloadZapret, getZapretState, setZapretGameFilter, startZapret, stopZapret, uninstallZapret, zapretRoot } from './zapret'
+import { calibrateMonitors, listMonitors } from './monitor'
 
 const WINDOW_WIDTH = 1280
 const WINDOW_HEIGHT = 800
@@ -74,6 +75,8 @@ app.whenReady().then(() => {
   ipcMain.handle('diag:network', () => getNetworkInfo())
   ipcMain.handle('diag:system', () => getSystemInfo())
   ipcMain.handle('diag:system-live', () => getSystemLive())
+  ipcMain.handle('monitor:list', () => listMonitors())
+  ipcMain.handle('monitor:calibrate', () => calibrateMonitors())
   ipcMain.handle('diag:ping', (_event, target: PingTarget, count?: number) =>
     pingTarget(target, count ?? 4)
   )

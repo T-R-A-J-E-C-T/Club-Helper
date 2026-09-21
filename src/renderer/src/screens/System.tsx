@@ -1,10 +1,10 @@
 import { Card, Kicker, Skeleton, Stat } from '@renderer/components/Card'
 import { PageHeader } from '@renderer/components/PageHeader'
 import { useDiagnostics } from '@renderer/context/DiagnosticsContext'
-import { bytes, ghz, gib, uptime } from '@renderer/lib/format'
+import { bytes, ghz, gib, panelName, uptime } from '@renderer/lib/format'
 
 export function SystemScreen(): React.JSX.Element {
-  const { system, loading, refreshSystem } = useDiagnostics()
+  const { system, loading, refreshSystem, monitors } = useDiagnostics()
 
   if (loading && !system) {
     return (
@@ -88,13 +88,15 @@ export function SystemScreen(): React.JSX.Element {
           <Card className="flex min-h-0 flex-col">
             <Kicker>Экраны</Kicker>
             <div className="mt-4 min-h-0 flex-1 space-y-5">
-              {system.displays.length ? (
-                system.displays.map((display, index) => (
+              {monitors == null ? (
+                <p className="text-sm text-muted">Читаем экраны…</p>
+              ) : monitors.length ? (
+                monitors.map((display, index) => (
                   <Stat
-                    key={`${display.model}-${index}`}
+                    key={`${display.name}-${display.refreshRate}-${index}`}
                     label={display.refreshRate ? `${display.refreshRate} Гц` : 'монитор'}
                     value={display.resolution}
-                    hint={[display.model, display.connection].filter(Boolean).join(' · ') || '—'}
+                    hint={panelName(display.name, index)}
                   />
                 ))
               ) : (

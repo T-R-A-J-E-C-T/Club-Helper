@@ -42,9 +42,9 @@ export function BootScreen({
         </button>
       </div>
 
-      <div className="flex items-center gap-4">
-        <img src={trajectLogo} alt="TRAJECT" className="h-[15px] w-auto object-contain" />
+      <div className="flex flex-col items-center gap-4">
         <div className="boot-spinner" />
+        <img src={trajectLogo} alt="TRAJECT" className="h-[15px] w-auto object-contain" />
       </div>
     </div>
   )

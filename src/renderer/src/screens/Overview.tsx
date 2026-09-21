@@ -50,7 +50,6 @@ export function Overview({ onOpen }: { onOpen: (tab: TabId) => void }): React.JS
         <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-accent" />
         {network?.externalIp ?? network?.ipv4 ?? 'нет IP'}
       </button>
-
       <div className="pointer-events-auto absolute inset-x-0 bottom-0 grid grid-cols-2 gap-4">
         <article className="rounded-[28px] bg-surface/72 p-6 ring-1 ring-white/8 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-3">

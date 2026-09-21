@@ -1,6 +1,6 @@
 export type HealthLevel = 'ok' | 'warn' | 'bad' | 'unknown' | 'pending'
 
-export type TabId = 'overview' | 'network' | 'ping' | 'audio' | 'system' | 'zapret'
+export type TabId = 'overview' | 'network' | 'ping' | 'audio' | 'system' | 'display' | 'zapret'
 
 export interface NetworkInfo {
   hostname: string
@@ -112,6 +112,23 @@ export interface DisplayInfo {
   connection: string | null
 }
 
+export interface MonitorStep {
+  label: string
+  ok: boolean
+}
+
+export interface MonitorView {
+  name: string
+  resolution: string
+  refreshRate: number | null
+  maxRefreshRate: number | null
+  brightness: number | null
+  contrast: number | null
+  ok: boolean
+  note: string | null
+  steps: MonitorStep[]
+}
+
 export interface SystemInfo {
   hostname: string
   manufacturer: string | null
@@ -200,6 +217,8 @@ export interface TrajectApi {
   onSpeedProgress: (callback: (progress: SpeedProgress) => void) => () => void
   getSystemInfo: () => Promise<SystemInfo>
   getSystemLive: () => Promise<SystemLive>
+  getMonitors: () => Promise<MonitorView[]>
+  calibrateMonitors: () => Promise<MonitorView[]>
   getZapretState: () => Promise<ZapretState>
   downloadZapret: () => Promise<ZapretActionResult>
   startZapret: (strategy: string) => Promise<ZapretActionResult>

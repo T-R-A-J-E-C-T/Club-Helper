@@ -84,6 +84,12 @@ export function uptime(seconds: number): string {
   return `${minutes} мин`
 }
 
+export function panelName(name: string, index: number): string {
+  const cleaned = name.replace(/generic|pnp|monitor|монитор/gi, '').replace(/\s+/g, ' ').trim()
+  if (cleaned.length < 3) return `Экран ${index + 1}`
+  return cleaned
+}
+
 export function ifaceType(type: string | null): string {
   if (!type) return 'адаптер'
   const value = type.toLowerCase()

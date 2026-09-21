@@ -33,4 +33,5 @@ jobs:
         with:
           files: |
             dist/traject-club-helper-*-setup.exe
+            dist/traject-club-helper-*-portable.exe
           generate_release_notes: true

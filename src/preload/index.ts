@@ -32,6 +32,8 @@ const api: TrajectApi = {
   },
   getSystemInfo: () => ipcRenderer.invoke('diag:system'),
   getSystemLive: () => ipcRenderer.invoke('diag:system-live'),
+  getMonitors: () => ipcRenderer.invoke('monitor:list'),
+  calibrateMonitors: () => ipcRenderer.invoke('monitor:calibrate'),
   getZapretState: () => ipcRenderer.invoke('zapret:state'),
   downloadZapret: () => ipcRenderer.invoke('zapret:download'),
   startZapret: (strategy: string) => ipcRenderer.invoke('zapret:start', strategy),

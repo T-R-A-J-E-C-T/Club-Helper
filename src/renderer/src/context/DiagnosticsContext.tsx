@@ -16,6 +16,7 @@ import {
   type PingTarget,
   type SpeedProgress,
   type SpeedTestResult,
+  type MonitorView,
   type SystemInfo,
   type SystemLive
 } from '@shared/types'
@@ -43,6 +44,9 @@ interface DiagnosticsState {
   pings: Record<string, PingResult>
   audio: AudioSnapshot
   speed: SpeedSnapshot
+  monitors: MonitorView[] | null
+  monitorError: string | null
+  calibrating: boolean
   loading: boolean
   pinging: boolean
   pendingPings: Record<string, true>
@@ -51,6 +55,8 @@ interface DiagnosticsState {
   refreshNetwork: () => Promise<void>
   refreshSystem: () => Promise<void>
   refreshAudio: () => Promise<void>
+  refreshMonitors: () => Promise<void>
+  calibrateMonitors: () => Promise<void>
   runPings: (count?: number, targets?: PingTarget[]) => Promise<void>
   runSpeedTest: () => Promise<void>
 }
@@ -120,6 +126,9 @@ export function DiagnosticsProvider({ children }: { children: ReactNode }): Reac
   const [pings, setPings] = useState<Record<string, PingResult>>({})
   const [audio, setAudio] = useState<AudioSnapshot>(emptyAudio)
   const [speed, setSpeed] = useState<SpeedSnapshot>(emptySpeed)
+  const [monitors, setMonitors] = useState<MonitorView[] | null>(null)
+  const [monitorError, setMonitorError] = useState<string | null>(null)
+  const [calibrating, setCalibrating] = useState(false)
   const [loading, setLoading] = useState(true)
   const [pendingPings, setPendingPings] = useState<Record<string, true>>({})
   const [error, setError] = useState<string | null>(null)
@@ -132,6 +141,27 @@ export function DiagnosticsProvider({ children }: { children: ReactNode }): Reac
   const refreshSystem = useCallback(async () => {
     const info = await window.api.getSystemInfo()
     setSystem(info)
+  }, [])
+
+  const refreshMonitors = useCallback(async () => {
+    try {
+      setMonitors(uniqueMonitors(await window.api.getMonitors()))
+      setMonitorError(null)
+    } catch (err) {
+      setMonitorError(err instanceof Error ? err.message : 'Монитор не прочитан')
+    }
+  }, [])
+
+  const calibrateMonitors = useCallback(async () => {
+    setCalibrating(true)
+    setMonitorError(null)
+    try {
+      setMonitors(uniqueMonitors(await window.api.calibrateMonitors()))
+    } catch (err) {
+      setMonitorError(err instanceof Error ? err.message : 'Не удалось откалибровать')
+    } finally {
+      setCalibrating(false)
+    }
   }, [])
 
   const refreshAudio = useCallback(async () => {
@@ -231,8 +261,9 @@ export function DiagnosticsProvider({ children }: { children: ReactNode }): Reac
       setLoading(false)
     }
     void refreshAudio()
+    void refreshMonitors()
     void runPings(2, BACKGROUND_TARGETS)
-  }, [refreshAudio, refreshNetwork, refreshSystem, runPings])
+  }, [refreshAudio, refreshMonitors, refreshNetwork, refreshSystem, runPings])
 
   useEffect(() => {
     void refreshAll()
@@ -284,6 +315,9 @@ export function DiagnosticsProvider({ children }: { children: ReactNode }): Reac
       pings,
       audio,
       speed,
+      monitors,
+      monitorError,
+      calibrating,
       loading,
       pinging,
       pendingPings,
@@ -292,19 +326,26 @@ export function DiagnosticsProvider({ children }: { children: ReactNode }): Reac
       refreshNetwork,
       refreshSystem,
       refreshAudio,
+      refreshMonitors,
+      calibrateMonitors,
       runPings,
       runSpeedTest
     }),
     [
       audio,
+      calibrating,
+      calibrateMonitors,
       error,
       loading,
+      monitorError,
+      monitors,
       network,
       pinging,
       pendingPings,
       pings,
       refreshAll,
       refreshAudio,
+      refreshMonitors,
       refreshNetwork,
       refreshSystem,
       runPings,
@@ -315,6 +356,16 @@ export function DiagnosticsProvider({ children }: { children: ReactNode }): Reac
   )
 
   return <DiagnosticsContext.Provider value={value}>{children}</DiagnosticsContext.Provider>
+}
+
+function uniqueMonitors(list: MonitorView[]): MonitorView[] {
+  const seen = new Set<string>()
+  return list.filter((item) => {
+    const key = `${item.name}|${item.resolution}|${item.refreshRate}|${item.brightness}|${item.contrast}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export function useDiagnostics(): DiagnosticsState {

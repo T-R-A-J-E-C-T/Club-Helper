@@ -7,6 +7,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: 'ping', label: 'Пинг' },
   { id: 'audio', label: 'Звук' },
   { id: 'system', label: 'Система' },
+  { id: 'display', label: 'Экран' },
   { id: 'zapret', label: 'Обход' }
 ]
 
