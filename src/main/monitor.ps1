@@ -96,6 +96,77 @@ public static class MonCal {
   }
   [DllImport("user32.dll", CharSet = CharSet.Auto)]
   public static extern bool EnumDisplayDevices(string device, uint devNum, ref DISPLAY_DEVICE displayDevice, uint flags);
+  [StructLayout(LayoutKind.Sequential)]
+  public struct LUID { public uint LowPart; public int HighPart; }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct RATIONAL { public uint Numerator; public uint Denominator; }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct PATH_SOURCE {
+    public LUID adapterId;
+    public uint id;
+    public uint modeInfoIdx;
+    public uint statusFlags;
+  }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct PATH_TARGET {
+    public LUID adapterId;
+    public uint id;
+    public uint modeInfoIdx;
+    public uint outputTechnology;
+    public uint rotation;
+    public uint scaling;
+    public RATIONAL refreshRate;
+    public uint scanLineOrdering;
+    public int targetAvailable;
+    public uint statusFlags;
+  }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct PATH_INFO {
+    public PATH_SOURCE sourceInfo;
+    public PATH_TARGET targetInfo;
+    public uint flags;
+  }
+  [StructLayout(LayoutKind.Explicit, Size = 80)]
+  public struct MODE_INFO {
+    [FieldOffset(0)] public uint infoType;
+    [FieldOffset(4)] public uint id;
+    [FieldOffset(8)] public LUID adapterId;
+  }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct DEVICE_HEADER {
+    public uint type;
+    public uint size;
+    public LUID adapterId;
+    public uint id;
+  }
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+  public struct SOURCE_NAME {
+    public DEVICE_HEADER header;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+    public string viewGdiDeviceName;
+  }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct COLOR_INFO {
+    public DEVICE_HEADER header;
+    public uint value;
+    public uint colorEncoding;
+    public uint bitsPerColorChannel;
+  }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct SET_COLOR {
+    public DEVICE_HEADER header;
+    public uint enableAdvancedColor;
+  }
+  [DllImport("user32.dll")]
+  public static extern int GetDisplayConfigBufferSizes(uint flags, out uint pathCount, out uint modeCount);
+  [DllImport("user32.dll")]
+  public static extern int QueryDisplayConfig(uint flags, ref uint pathCount, [Out] PATH_INFO[] paths, ref uint modeCount, [Out] MODE_INFO[] modes, IntPtr topology);
+  [DllImport("user32.dll")]
+  public static extern int DisplayConfigGetDeviceInfo(ref SOURCE_NAME packet);
+  [DllImport("user32.dll")]
+  public static extern int DisplayConfigGetDeviceInfo(ref COLOR_INFO packet);
+  [DllImport("user32.dll")]
+  public static extern int DisplayConfigSetDeviceInfo(ref SET_COLOR packet);
 }
 "@
 
@@ -194,6 +265,48 @@ function Get-PanelName([string]$device) {
   return $null
 }
 
+function Disable-Hdr([string]$device) {
+  $result = @{ relevant = $false; ok = $true; changed = $false }
+  $pathCount = [uint32]0
+  $modeCount = [uint32]0
+  if ([MonCal]::GetDisplayConfigBufferSizes(2, [ref]$pathCount, [ref]$modeCount) -ne 0 -or $pathCount -lt 1) { return $result }
+  $paths = New-Object MonCal+PATH_INFO[] ([int]$pathCount)
+  $modes = New-Object MonCal+MODE_INFO[] ([int]$modeCount)
+  if ([MonCal]::QueryDisplayConfig(2, [ref]$pathCount, $paths, [ref]$modeCount, $modes, [IntPtr]::Zero) -ne 0) { return $result }
+  $wanted = $device.Trim()
+  for ($i = 0; $i -lt [int]$pathCount; $i++) {
+    $nameHeader = New-Object MonCal+DEVICE_HEADER
+    $nameHeader.type = [uint32]1
+    $nameHeader.size = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][MonCal+SOURCE_NAME])
+    $nameHeader.adapterId = $paths[$i].sourceInfo.adapterId
+    $nameHeader.id = $paths[$i].sourceInfo.id
+    $source = New-Object MonCal+SOURCE_NAME
+    $source.header = $nameHeader
+    if ([MonCal]::DisplayConfigGetDeviceInfo([ref]$source) -ne 0) { continue }
+    if ($source.viewGdiDeviceName -ne $wanted) { continue }
+    $colorHeader = New-Object MonCal+DEVICE_HEADER
+    $colorHeader.type = [uint32]9
+    $colorHeader.size = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][MonCal+COLOR_INFO])
+    $colorHeader.adapterId = $paths[$i].targetInfo.adapterId
+    $colorHeader.id = $paths[$i].targetInfo.id
+    $color = New-Object MonCal+COLOR_INFO
+    $color.header = $colorHeader
+    if ([MonCal]::DisplayConfigGetDeviceInfo([ref]$color) -ne 0) { continue }
+    if (($color.value -band 2) -eq 0) { continue }
+    $result.relevant = $true
+    $setHeader = New-Object MonCal+DEVICE_HEADER
+    $setHeader.type = [uint32]10
+    $setHeader.size = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][MonCal+SET_COLOR])
+    $setHeader.adapterId = $paths[$i].targetInfo.adapterId
+    $setHeader.id = $paths[$i].targetInfo.id
+    $set = New-Object MonCal+SET_COLOR
+    $set.header = $setHeader
+    $set.enableAdvancedColor = [uint32]0
+    if ([MonCal]::DisplayConfigSetDeviceInfo([ref]$set) -eq 0) { $result.changed = $true } else { $result.ok = $false }
+  }
+  return $result
+}
+
 $script:found = @()
 $script:seenDevice = @{}
 $callback = [MonCal+MonitorEnumProc]{
@@ -217,6 +330,11 @@ $callback = [MonCal+MonitorEnumProc]{
 
 $items = @()
 foreach ($monitor in $script:found) {
+  $hdr = @{ relevant = $false; ok = $true; changed = $false }
+  if ($action -eq 'calibrate') {
+    try { $hdr = Disable-Hdr $monitor.device } catch { $hdr = @{ relevant = $false; ok = $true; changed = $false } }
+    if ($hdr.changed) { Start-Sleep -Milliseconds 400 }
+  }
   $refresh = Get-Refresh $monitor.device ($action -eq 'calibrate')
   $name = Get-PanelName $monitor.device
   if ([string]::IsNullOrWhiteSpace($name)) { $name = $monitor.device }
@@ -234,6 +352,9 @@ foreach ($monitor in $script:found) {
     }
   }
 
+  if ($action -eq 'calibrate' -and $hdr.relevant) {
+    $steps += @{ label = 'HDR выключен'; ok = [bool]$hdr.ok }
+  }
   if ($action -eq 'calibrate' -and $refresh.max) {
     $steps += @{ label = "$($refresh.max) Гц"; ok = [bool]$refresh.applied }
   }
