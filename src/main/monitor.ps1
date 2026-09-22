@@ -72,6 +72,8 @@ public static class MonCal {
   [DllImport("user32.dll", CharSet = CharSet.Auto)]
   public static extern bool EnumDisplaySettings(string device, int mode, ref DEVMODE devMode);
   [DllImport("user32.dll", CharSet = CharSet.Auto)]
+  public static extern bool EnumDisplaySettingsEx(string device, int mode, ref DEVMODE devMode, int flags);
+  [DllImport("user32.dll", CharSet = CharSet.Auto)]
   public static extern int ChangeDisplaySettingsEx(string device, ref DEVMODE devMode, IntPtr hwnd, uint flags, IntPtr param);
   [DllImport("dxva2.dll", SetLastError = true)]
   public static extern bool GetNumberOfPhysicalMonitorsFromHMONITOR(IntPtr hMonitor, out uint count);
@@ -286,29 +288,47 @@ function Set-FpsFirm([IntPtr]$handle, [int]$fps) {
 }
 
 function Get-Refresh([string]$device, [bool]$apply) {
+  $modeBytes = [Runtime.InteropServices.Marshal]::SizeOf([type][MonCal+DEVMODE])
   $current = New-Object MonCal+DEVMODE
-  $current.dmSize = [Runtime.InteropServices.Marshal]::SizeOf($current)
+  $current.dmSize = $modeBytes
   $enumCurrent = -1
   if (-not [MonCal]::EnumDisplaySettings($device, $enumCurrent, [ref]$current)) {
     return @{ ok = $false; hz = $null; max = $null; width = $null; height = $null }
   }
-  $best = $null
-  $bestHz = 0
-  for ($i = 0; $i -lt 400; $i++) {
-    $mode = New-Object MonCal+DEVMODE
-    $mode.dmSize = [Runtime.InteropServices.Marshal]::SizeOf($mode)
-    if (-not [MonCal]::EnumDisplaySettings($device, $i, [ref]$mode)) { break }
-    if ($mode.dmPelsWidth -ne $current.dmPelsWidth -or $mode.dmPelsHeight -ne $current.dmPelsHeight) { continue }
-    if ($mode.dmBitsPerPel -lt 32) { continue }
-    if (($mode.dmDisplayFlags -band 2) -ne 0) { continue }
-    if ($mode.dmDisplayFrequency -gt $bestHz) {
-      $bestHz = $mode.dmDisplayFrequency
-      $best = $mode
+  $best = $current
+  $bestHz = [int]$current.dmDisplayFrequency
+  $seen = @{}
+  $fields = 0x00080000 -bor 0x00100000 -bor 0x00040000 -bor 0x00400000
+  foreach ($pass in @(
+      @{ kind = 'raw'; flags = 2 },
+      @{ kind = 'listed'; flags = 0 }
+    )) {
+    for ($i = 0; $i -lt 800; $i++) {
+      $mode = New-Object MonCal+DEVMODE
+      $mode.dmSize = $modeBytes
+      $found = if ($pass.kind -eq 'raw') {
+        [MonCal]::EnumDisplaySettingsEx($device, $i, [ref]$mode, [int]$pass.flags)
+      } else {
+        [MonCal]::EnumDisplaySettings($device, $i, [ref]$mode)
+      }
+      if (-not $found) { break }
+      if ($mode.dmPelsWidth -ne $current.dmPelsWidth -or $mode.dmPelsHeight -ne $current.dmPelsHeight) { continue }
+      if ($mode.dmBitsPerPel -lt 32) { continue }
+      if (($mode.dmDisplayFlags -band 2) -ne 0) { continue }
+      $hz = [int]$mode.dmDisplayFrequency
+      if ($hz -le $bestHz -or $seen.ContainsKey($hz)) { continue }
+      $seen[$hz] = $true
+      $mode.dmFields = $fields
+      $code = [MonCal]::ChangeDisplaySettingsEx($device, [ref]$mode, [IntPtr]::Zero, 0x02, [IntPtr]::Zero)
+      if ($code -eq 0) {
+        $best = $mode
+        $bestHz = $hz
+      }
     }
   }
   $changed = $false
-  if ($apply -and $null -ne $best -and $bestHz -gt $current.dmDisplayFrequency) {
-    $best.dmFields = 0x00080000 -bor 0x00100000 -bor 0x00040000 -bor 0x00400000
+  if ($apply -and $bestHz -gt [int]$current.dmDisplayFrequency) {
+    $best.dmFields = $fields
     $code = [MonCal]::ChangeDisplaySettingsEx($device, [ref]$best, [IntPtr]::Zero, 0x01, [IntPtr]::Zero)
     $changed = ($code -eq 0)
     if ($changed) { $current = $best }
