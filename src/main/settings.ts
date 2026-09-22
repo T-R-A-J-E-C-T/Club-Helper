@@ -5,7 +5,8 @@ import type { AppSettings } from '@shared/types'
 
 const DEFAULTS: AppSettings = {
   openAtLogin: false,
-  startInTray: false
+  startInTray: false,
+  openDiscord: false
 }
 
 function settingsFile(): string {
@@ -17,7 +18,8 @@ export async function readAppSettings(): Promise<AppSettings> {
     const parsed = JSON.parse(await readFile(settingsFile(), 'utf8')) as Partial<AppSettings>
     return {
       openAtLogin: Boolean(parsed.openAtLogin),
-      startInTray: Boolean(parsed.startInTray)
+      startInTray: Boolean(parsed.startInTray),
+      openDiscord: Boolean(parsed.openDiscord)
     }
   } catch {
     return { ...DEFAULTS }
@@ -42,6 +44,7 @@ export function applyOpenAtLogin(enabled: boolean): void {
 export function mergeAppSettings(current: AppSettings, patch: Partial<AppSettings>): AppSettings {
   return {
     openAtLogin: typeof patch.openAtLogin === 'boolean' ? patch.openAtLogin : current.openAtLogin,
-    startInTray: typeof patch.startInTray === 'boolean' ? patch.startInTray : current.startInTray
+    startInTray: typeof patch.startInTray === 'boolean' ? patch.startInTray : current.startInTray,
+    openDiscord: typeof patch.openDiscord === 'boolean' ? patch.openDiscord : current.openDiscord
   }
 }

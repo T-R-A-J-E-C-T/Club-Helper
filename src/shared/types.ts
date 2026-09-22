@@ -5,6 +5,7 @@ export type TabId = 'overview' | 'network' | 'ping' | 'audio' | 'system' | 'disp
 export interface AppSettings {
   openAtLogin: boolean
   startInTray: boolean
+  openDiscord: boolean
 }
 
 export interface NetworkInfo {
@@ -217,6 +218,7 @@ export interface TrajectApi {
   close: () => void
   getAppSettings: () => Promise<AppSettings>
   setAppSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
+  openDiscord: () => Promise<ZapretActionResult>
   getNetworkInfo: () => Promise<NetworkInfo>
   ping: (target: PingTarget, count?: number) => Promise<PingResult>
   pingMany: (targets: PingTarget[], count?: number) => Promise<PingResult[]>

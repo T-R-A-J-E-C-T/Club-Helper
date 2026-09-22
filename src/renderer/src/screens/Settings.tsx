@@ -51,6 +51,14 @@ export function SettingsScreen(): React.JSX.Element {
           disabled={!settings}
           onChange={(startInTray) => void update({ startInTray })}
         />
+        <div className="my-6 h-px bg-line" />
+        <SettingRow
+          title="Discord"
+          text="Открывать после включения обхода с главной"
+          on={Boolean(settings?.openDiscord)}
+          disabled={!settings}
+          onChange={(openDiscord) => void update({ openDiscord })}
+        />
         {error ? <p className="mt-5 text-sm text-bad">{error}</p> : null}
       </Card>
     </div>

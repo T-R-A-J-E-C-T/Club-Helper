@@ -22,7 +22,7 @@ interface ZapretContextValue {
   setReleaseTag: (tag: string) => void
   refresh: () => Promise<void>
   download: (tag?: string) => Promise<void>
-  start: (file?: string) => Promise<void>
+  start: (file?: string) => Promise<boolean>
   stop: () => Promise<void>
   uninstall: () => Promise<void>
   toggle: () => Promise<void>
@@ -107,7 +107,7 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
   }, [])
 
   const run = useCallback(
-    async (action: () => Promise<{ ok: boolean; cancelled?: boolean; error?: string }>) => {
+    async (action: () => Promise<{ ok: boolean; cancelled?: boolean; error?: string }>): Promise<boolean> => {
       setBusy(true)
       setError(null)
       try {
@@ -115,8 +115,10 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
         await refresh()
         if (!result.ok && !result.cancelled) setError(friendlyZapretError(result.error))
         if (result.cancelled) setError('Нужно разрешить права администратора')
+        return result.ok
       } catch (err) {
         setError(friendlyZapretError(err instanceof Error ? err.message : undefined))
+        return false
       } finally {
         setBusy(false)
         setDownloadPercent(null)
@@ -145,11 +147,11 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
     }
   }, [refresh])
 
-  const start = useCallback(async (file?: string) => {
+  const start = useCallback(async (file?: string): Promise<boolean> => {
     const chosen = file || selectedRef.current
     pickDirty.current = false
     if (chosen) setSelected(chosen)
-    await run(() => window.api.startZapret(chosen))
+    return run(() => window.api.startZapret(chosen))
   }, [run])
 
   const stop = useCallback(async () => {
@@ -198,7 +200,12 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
       next = await window.api.getZapretState()
       if (!next.ready) return
     }
-    await start(resolveQuickFile(next.strategies))
+    const started = await start(resolveQuickFile(next.strategies))
+    if (!started) return
+    const settings = await window.api.getAppSettings()
+    if (!settings.openDiscord) return
+    const opened = await window.api.openDiscord()
+    if (!opened.ok) setError(opened.error || 'Discord не найден')
   }, [download, start, stop])
 
   const toggleGameFilter = useCallback(

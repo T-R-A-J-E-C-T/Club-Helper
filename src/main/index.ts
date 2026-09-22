@@ -7,12 +7,13 @@ import type { AppSettings, PingTarget } from '@shared/types'
 import { getNetworkInfo, getSystemInfo, getSystemLive, pingMany, pingTarget, runSpeedTest } from './diagnostics'
 import { downloadZapret, getZapretState, listZapretReleases, setZapretGameFilter, startZapret, stopZapret, uninstallZapret, zapretRoot } from './zapret'
 import { calibrateMonitors, listMonitors } from './monitor'
+import { openDiscord } from './discord'
 import { applyOpenAtLogin, mergeAppSettings, readAppSettings, writeAppSettings } from './settings'
 
 const WINDOW_WIDTH = 1280
 const WINDOW_HEIGHT = 800
 
-let launchSettings: AppSettings = { openAtLogin: false, startInTray: false }
+let launchSettings: AppSettings = { openAtLogin: false, startInTray: false, openDiscord: false }
 let tray: Tray | null = null
 let quitting = false
 
@@ -164,6 +165,7 @@ if (hasInstanceLock) app.whenReady().then(async () => {
     return error ? { ok: false, error } : { ok: true }
   })
   ipcMain.handle('settings:get', () => launchSettings)
+  ipcMain.handle('discord:open', () => openDiscord())
   ipcMain.handle('settings:set', async (_event, patch: Partial<AppSettings>) => {
     launchSettings = mergeAppSettings(launchSettings, patch)
     await writeAppSettings(launchSettings)
