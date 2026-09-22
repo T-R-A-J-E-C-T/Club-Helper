@@ -219,7 +219,6 @@ export interface TrajectApi {
   getSystemInfo: () => Promise<SystemInfo>
   getSystemLive: () => Promise<SystemLive>
   getMonitors: () => Promise<MonitorView[]>
-  readMonitorModes: () => Promise<MonitorView[]>
   calibrateMonitors: () => Promise<MonitorView[]>
   getZapretState: () => Promise<ZapretState>
   downloadZapret: () => Promise<ZapretActionResult>

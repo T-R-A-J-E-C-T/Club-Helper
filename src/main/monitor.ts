@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import scriptSource from './monitor.ps1?raw'
 import type { MonitorView } from '@shared/types'
 
-type Action = 'list' | 'calibrate' | 'mode'
+type Action = 'list' | 'calibrate'
 
 function scriptBody(action: Action): string {
   return scriptSource.replace('__ACTION__', action)
@@ -69,10 +69,6 @@ function run(action: Action): Promise<MonitorView[]> {
 
 export function listMonitors(): Promise<MonitorView[]> {
   return run('list')
-}
-
-export function readMonitorModes(): Promise<MonitorView[]> {
-  return run('mode')
 }
 
 export function calibrateMonitors(): Promise<MonitorView[]> {
