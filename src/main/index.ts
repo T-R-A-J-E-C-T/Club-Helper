@@ -268,6 +268,7 @@ if (hasInstanceLock) app.whenReady().then(async () => {
     return error ? { ok: false, error } : { ok: true }
   })
   ipcMain.handle('settings:get', () => launchSettings)
+  ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('discord:open', () => openDiscord())
   ipcMain.handle('settings:set', async (_event, patch: Partial<AppSettings>) => {
     launchSettings = mergeAppSettings(launchSettings, patch)

@@ -13,6 +13,7 @@ const api: TrajectApi = {
   close: () => ipcRenderer.send('window:close'),
   getAppSettings: () => ipcRenderer.invoke('settings:get'),
   setAppSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
+  getAppVersion: () => ipcRenderer.invoke('app:version'),
   openDiscord: () => ipcRenderer.invoke('discord:open'),
   getNetworkInfo: () => ipcRenderer.invoke('diag:network'),
   ping: (target, count) => ipcRenderer.invoke('diag:ping', target, count),

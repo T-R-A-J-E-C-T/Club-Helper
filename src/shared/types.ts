@@ -218,6 +218,7 @@ export interface TrajectApi {
   close: () => void
   getAppSettings: () => Promise<AppSettings>
   setAppSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
+  getAppVersion: () => Promise<string>
   openDiscord: () => Promise<ZapretActionResult>
   getNetworkInfo: () => Promise<NetworkInfo>
   ping: (target: PingTarget, count?: number) => Promise<PingResult>

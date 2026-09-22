@@ -6,6 +6,7 @@ import type { AppSettings } from '@shared/types'
 
 export function SettingsScreen(): React.JSX.Element {
   const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [version, setVersion] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -18,6 +19,9 @@ export function SettingsScreen(): React.JSX.Element {
       .catch(() => {
         if (!stop) setError('Не удалось прочитать настройки')
       })
+    void window.api.getAppVersion().then((next) => {
+      if (!stop) setVersion(next)
+    })
     return () => {
       stop = true
     }
@@ -61,6 +65,11 @@ export function SettingsScreen(): React.JSX.Element {
         />
         {error ? <p className="mt-5 text-sm text-bad">{error}</p> : null}
       </Card>
+      <p className="mt-auto flex w-full items-center justify-center gap-5 text-[13px] text-muted">
+        <span>Developed by Traject for COLIZEUM СПАССКИЙ</span>
+        <span>MIT License · Copyright 2026 Traject</span>
+        <span>{version ? `Version ${version}` : 'Version'}</span>
+      </p>
     </div>
   )
 }
