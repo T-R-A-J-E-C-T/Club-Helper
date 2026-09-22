@@ -240,21 +240,9 @@ function Get-Caps([IntPtr]$handle) {
   return $builder.ToString()
 }
 
-function Get-DcValues([string]$caps) {
-  if ($caps -notmatch '(?i)DC\(([^)]*)\)') { return @() }
-  $inside = $Matches[1]
-  return @([regex]::Matches($inside, '[0-9A-Fa-f]{1,2}') | ForEach-Object { [Convert]::ToInt32($_.Value, 16) })
-}
-
-function Get-FpsFromRace([int]$race, $vals) {
-  $list = @($vals)
-  if ($list.Count -ge 5) {
-    $idx = [array]::IndexOf([int[]]$list, $race)
-    # Menu: Scenery, Racing, Cinema, RTS/RPG, FPS. FPS is three slots after Racing.
-    if ($idx -ge 0 -and ($idx + 3) -lt $list.Count) { return [int]$list[$idx + 3] }
-  }
-  if ($race -eq 4) { return 7 }
-  return 4
+function Get-FpsCode([string]$caps) {
+  # ASUS lists GameVisual codes out of menu order. 0x04 is Racing on VG279, 0x13 is FPS.
+  return 0x13
 }
 
 function Wait-PictureStable([IntPtr]$handle) {
@@ -508,13 +496,11 @@ foreach ($monitor in $settled) {
     if ($action -eq 'calibrate') {
       if ($refresh.changed) { Start-Sleep -Milliseconds 1500 }
       $colorOk = $true
-      $race = $null
       if (& $supports '08') {
         $colorOk = Write-Vcp $handle 0x08 1
-        $race = Wait-PictureStable $handle
+        [void](Wait-PictureStable $handle)
       }
-      $fps = 4
-      if ($null -ne $race) { $fps = Get-FpsFromRace ([int]$race) (Get-DcValues $caps) }
+      $fps = Get-FpsCode $caps
       $level = 100
       $fpsOk = Set-FpsFirm $handle $fps
       $brightOk = Write-Vcp $handle 0x10 ([uint32]$level)
