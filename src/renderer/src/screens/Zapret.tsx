@@ -157,14 +157,6 @@ export function ZapretScreen(): React.JSX.Element {
                 )}
               </div>
             </div>
-            {busy && downloadPercent != null ? (
-              <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-page-deep">
-                <div
-                  className="meter-fill h-full rounded-full bg-accent"
-                  style={{ width: `${downloadPercent}%` }}
-                />
-              </div>
-            ) : null}
           </Card>
 
           <Card className="flex-1">
