@@ -5,7 +5,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.ico?asset'
 import type { PingTarget } from '@shared/types'
 import { getNetworkInfo, getSystemInfo, getSystemLive, pingMany, pingTarget, runSpeedTest } from './diagnostics'
-import { downloadZapret, getZapretState, setZapretGameFilter, startZapret, stopZapret, uninstallZapret, zapretRoot } from './zapret'
+import { downloadZapret, getZapretState, listZapretReleases, setZapretGameFilter, startZapret, stopZapret, uninstallZapret, zapretRoot } from './zapret'
 import { calibrateMonitors, listMonitors } from './monitor'
 
 const WINDOW_WIDTH = 1280
@@ -85,10 +85,12 @@ app.whenReady().then(() => {
   )
   ipcMain.handle('diag:speed', (event) => runSpeedTest(event.sender))
   ipcMain.handle('zapret:state', () => getZapretState())
-  ipcMain.handle('zapret:download', async (event) => {
+  ipcMain.handle('zapret:releases', () => listZapretReleases())
+  ipcMain.handle('zapret:download', async (event, tag?: string) => {
+    const chosen = typeof tag === 'string' && tag.trim() ? tag.trim() : undefined
     return downloadZapret((received, total) => {
       event.sender.send('zapret:download-progress', { received, total })
-    })
+    }, chosen)
   })
   ipcMain.handle('zapret:start', (_event, strategy: string) => startZapret(strategy))
   ipcMain.handle('zapret:stop', () => stopZapret())

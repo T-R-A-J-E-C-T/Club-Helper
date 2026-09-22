@@ -6,10 +6,11 @@ import https from 'node:https'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
-import type { ZapretActionResult, ZapretState, ZapretStrategy } from '@shared/types'
+import type { ZapretActionResult, ZapretRelease, ZapretState, ZapretStrategy } from '@shared/types'
 
 const execFileAsync = promisify(execFile)
 const GITHUB_API = 'https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases/latest'
+const GITHUB_RELEASES = 'https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases?per_page=100'
 const USER_AGENT = 'TrajectClubHelper'
 const PRESERVE = [
   'lists/list-general-user.txt',
@@ -32,6 +33,7 @@ interface ReleaseAsset {
 
 interface GithubRelease {
   tag_name: string
+  draft?: boolean
   assets: ReleaseAsset[]
 }
 
@@ -177,7 +179,7 @@ async function listStrategies(): Promise<ZapretStrategy[]> {
 async function readVersion(): Promise<string | null> {
   try {
     const bat = await readFile(join(zapretRoot(), 'service.bat'), 'utf8')
-    const match = bat.match(/LOCAL_VERSION=([0-9.]+)/i)
+    const match = bat.match(/LOCAL_VERSION=["']?([^"'\s\r\n]+)/i)
     return match?.[1] ?? null
   } catch {
     return null
@@ -664,14 +666,31 @@ async function findExtractRoot(extractDir: string): Promise<string> {
   throw new Error('В архиве нет bin\\winws.exe')
 }
 
+export async function listZapretReleases(): Promise<ZapretRelease[]> {
+  const releases = await readJson<GithubRelease[]>(GITHUB_RELEASES)
+  if (!Array.isArray(releases)) return []
+  return releases
+    .filter(
+      (item) =>
+        Boolean(item?.tag_name) &&
+        !item.draft &&
+        item.assets?.some((asset) => asset.name.toLowerCase().endsWith('.zip'))
+    )
+    .map((item) => ({ tag: item.tag_name }))
+}
+
 export async function downloadZapret(
-  onProgress?: (received: number, total: number) => void
+  onProgress?: (received: number, total: number) => void,
+  tag?: string
 ): Promise<ZapretActionResult> {
   try {
-    const release = await readJson<GithubRelease>(GITHUB_API)
+    const releaseUrl = tag
+      ? `https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases/tags/${encodeURIComponent(tag)}`
+      : GITHUB_API
+    const release = await readJson<GithubRelease>(releaseUrl)
     const asset =
-      release.assets.find((item) => item.name.toLowerCase().endsWith('.zip')) ??
-      release.assets.find((item) => item.name.toLowerCase().endsWith('.tar.gz'))
+      release.assets?.find((item) => item.name.toLowerCase().endsWith('.zip')) ??
+      release.assets?.find((item) => item.name.toLowerCase().endsWith('.tar.gz'))
     if (!asset) return { ok: false, error: 'В релизе нет архива' }
 
     const zipPath = join(tmpdir(), asset.name)

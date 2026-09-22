@@ -221,7 +221,8 @@ export interface TrajectApi {
   getMonitors: () => Promise<MonitorView[]>
   calibrateMonitors: () => Promise<MonitorView[]>
   getZapretState: () => Promise<ZapretState>
-  downloadZapret: () => Promise<ZapretActionResult>
+  listZapretReleases: () => Promise<ZapretRelease[]>
+  downloadZapret: (tag?: string) => Promise<ZapretActionResult>
   startZapret: (strategy: string) => Promise<ZapretActionResult>
   stopZapret: () => Promise<ZapretActionResult>
   uninstallZapret: () => Promise<ZapretActionResult>
@@ -239,6 +240,10 @@ export interface ZapretActionResult {
   ok: boolean
   cancelled?: boolean
   error?: string
+}
+
+export interface ZapretRelease {
+  tag: string
 }
 
 export interface ZapretStrategy {

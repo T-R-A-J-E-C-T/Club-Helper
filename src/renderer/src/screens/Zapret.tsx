@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Card, Kicker } from '@renderer/components/Card'
 import { PageHeader } from '@renderer/components/PageHeader'
 import { Toggle } from '@renderer/components/Toggle'
@@ -16,6 +17,9 @@ export function ZapretScreen(): React.JSX.Element {
     error,
     selected,
     setSelected,
+    releases,
+    releaseTag,
+    setReleaseTag,
     download,
     start,
     stop,
@@ -62,16 +66,6 @@ export function ZapretScreen(): React.JSX.Element {
                 >
                   Показать в папке
                 </button>
-                {ready ? (
-                  <button
-                    type="button"
-                    disabled={busy || running}
-                    onClick={() => void download()}
-                    className={`${headerChip} text-muted hover:bg-white/8 hover:text-ink disabled:opacity-40`}
-                  >
-                    {busy && downloadPercent != null ? `Обновление ${downloadPercent}%` : 'Обновить файлы'}
-                  </button>
-                ) : null}
                 <button
                   type="button"
                   disabled={busy}
@@ -106,40 +100,64 @@ export function ZapretScreen(): React.JSX.Element {
               </p>
             ) : null}
             <div className="mt-auto pt-8">
-              {!ready ? (
-                <button
-                  type="button"
+              <div className="flex items-center gap-2">
+                <VersionMenu
+                  tags={releases.map((item) => item.tag)}
+                  value={releaseTag}
+                  installed={state?.version ?? null}
                   disabled={busy}
-                  onClick={() => void download()}
-                  className="rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-accent-ink disabled:opacity-60"
-                >
-                  {busy
-                    ? downloadPercent != null
-                      ? `Скачиваем… ${downloadPercent}%`
-                      : 'Скачиваем…'
-                    : 'Скачать zapret'}
-                </button>
-              ) : running ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void stop()}
-                  className="rounded-full bg-accent-ink px-5 py-2.5 text-[13px] font-semibold text-accent disabled:opacity-60"
-                >
-                  {busy ? 'Выключаем…' : 'Выключить'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy || !selected}
-                  onClick={() => void start()}
-                  className="rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-accent-ink disabled:opacity-60"
-                >
-                  {busy ? 'Включаем…' : 'Включить обход'}
-                </button>
-              )}
+                  light={running}
+                  onChange={setReleaseTag}
+                />
+                {ready ? (
+                  <button
+                    type="button"
+                    disabled={busy || running || !releaseTag}
+                    onClick={() => void download(releaseTag)}
+                    className={`shrink-0 rounded-full px-4 py-2.5 text-[13px] font-semibold disabled:opacity-60 ${
+                      running ? 'bg-accent-ink text-accent' : 'bg-white/8 text-ink hover:bg-white/12'
+                    }`}
+                  >
+                    {busy && downloadPercent != null ? `${downloadPercent}%` : 'Установить'}
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-3">
+                {!ready ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void download(releaseTag || undefined)}
+                    className="rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-accent-ink disabled:opacity-60"
+                  >
+                    {busy
+                      ? downloadPercent != null
+                        ? `Скачиваем… ${downloadPercent}%`
+                        : 'Скачиваем…'
+                      : 'Скачать zapret'}
+                  </button>
+                ) : running ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void stop()}
+                    className="rounded-full bg-accent-ink px-5 py-2.5 text-[13px] font-semibold text-accent disabled:opacity-60"
+                  >
+                    {busy && downloadPercent == null ? 'Выключаем…' : 'Выключить'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy || !selected}
+                    onClick={() => void start()}
+                    className="rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-accent-ink disabled:opacity-60"
+                  >
+                    {busy && downloadPercent == null ? 'Включаем…' : 'Включить обход'}
+                  </button>
+                )}
+              </div>
             </div>
-            {!ready && busy && downloadPercent != null ? (
+            {busy && downloadPercent != null ? (
               <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-page-deep">
                 <div
                   className="meter-fill h-full rounded-full bg-accent"
@@ -280,6 +298,106 @@ export function ZapretScreen(): React.JSX.Element {
           </div>
         </Card>
       </div>
+    </div>
+  )
+}
+
+function VersionMenu({
+  tags,
+  value,
+  installed,
+  disabled,
+  light,
+  onChange
+}: {
+  tags: string[]
+  value: string
+  installed: string | null
+  disabled: boolean
+  light: boolean
+  onChange: (tag: string) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const [box, setBox] = useState<{ top: number; left: number; width: number } | null>(null)
+  const root = useRef<HTMLDivElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+  const label = value || (tags.length ? tags[0] : 'Версии…')
+
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (event: MouseEvent): void => {
+      const target = event.target as Node
+      if (root.current?.contains(target) || menu.current?.contains(target)) return
+      setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div ref={root} className="relative min-w-0 flex-1">
+      <button
+        type="button"
+        disabled={disabled || !tags.length}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => {
+          const rect = root.current?.getBoundingClientRect()
+          if (rect) setBox({ top: rect.bottom + 8, left: rect.left, width: Math.max(rect.width, 168) })
+          setOpen((current) => !current)
+        }}
+        className={`flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-[13px] disabled:opacity-60 ${
+          light ? 'bg-accent-ink/10 text-accent-ink' : 'bg-white/6 text-ink ring-1 ring-inset ring-white/8 hover:bg-white/10'
+        }`}
+      >
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" className={`shrink-0 ${light ? 'text-accent-ink/70' : 'text-muted'} ${open ? 'rotate-180' : ''}`}>
+          <path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && box
+        ? createPortal(
+            <div
+              ref={menu}
+              className="fixed z-50 overflow-hidden rounded-2xl bg-surface/95 p-1.5 shadow-[0_18px_40px_rgba(0,0,0,.45)] ring-1 ring-white/8 backdrop-blur-xl"
+              style={{ top: box.top, left: box.left, width: box.width }}
+            >
+              <ul role="listbox" className="menu-scroll max-h-64">
+                {tags.map((tag) => {
+                  const active = tag === value
+                  const current = tag === installed
+                  return (
+                    <li key={tag}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={active}
+                        onClick={() => {
+                          onChange(tag)
+                          setOpen(false)
+                        }}
+                        className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] ${
+                          active ? 'bg-accent font-semibold text-accent-ink' : 'text-ink hover:bg-white/6'
+                        }`}
+                      >
+                        <span className="truncate">{tag}</span>
+                        {current ? <span className={active ? 'text-accent-ink/70' : 'text-muted'}>сейчас</span> : null}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   )
 }

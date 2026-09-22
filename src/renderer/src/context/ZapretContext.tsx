@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode
 } from 'react'
-import type { ZapretState } from '@shared/types'
+import type { ZapretRelease, ZapretState } from '@shared/types'
 
 interface ZapretContextValue {
   state: ZapretState | null
@@ -17,8 +17,11 @@ interface ZapretContextValue {
   error: string | null
   selected: string
   setSelected: (file: string) => void
+  releases: ZapretRelease[]
+  releaseTag: string
+  setReleaseTag: (tag: string) => void
   refresh: () => Promise<void>
-  download: () => Promise<void>
+  download: (tag?: string) => Promise<void>
   start: (file?: string) => Promise<void>
   stop: () => Promise<void>
   uninstall: () => Promise<void>
@@ -41,14 +44,22 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
   const [downloadPercent, setDownloadPercent] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState('')
+  const [releases, setReleases] = useState<ZapretRelease[]>([])
+  const [releaseTag, setReleaseTagState] = useState('')
   const [booted, setBooted] = useState(false)
   const selectedRef = useRef(selected)
   const pickDirty = useRef(false)
+  const releaseDirty = useRef(false)
   selectedRef.current = selected
 
   const pick = useCallback((file: string) => {
     pickDirty.current = true
     setSelected(file)
+  }, [])
+
+  const pickRelease = useCallback((tag: string) => {
+    releaseDirty.current = true
+    setReleaseTagState(tag)
   }, [])
 
   const refresh = useCallback(async () => {
@@ -77,6 +88,24 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
     return () => window.clearInterval(timer)
   }, [refresh])
 
+  useEffect(() => {
+    let stop = false
+    void window.api
+      .listZapretReleases()
+      .then((list) => {
+        if (stop) return
+        setReleases(list)
+        setReleaseTagState((current) => {
+          if (releaseDirty.current && list.some((item) => item.tag === current)) return current
+          return list[0]?.tag || current
+        })
+      })
+      .catch(() => undefined)
+    return () => {
+      stop = true
+    }
+  }, [])
+
   const run = useCallback(
     async (action: () => Promise<{ ok: boolean; cancelled?: boolean; error?: string }>) => {
       setBusy(true)
@@ -96,7 +125,7 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
     [refresh]
   )
 
-  const download = useCallback(async () => {
+  const download = useCallback(async (tag?: string) => {
     setBusy(true)
     setError(null)
     setDownloadPercent(0)
@@ -104,7 +133,7 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
       setDownloadPercent(progress.total ? Math.round((progress.received / progress.total) * 100) : 0)
     })
     try {
-      const result = await window.api.downloadZapret()
+      const result = await window.api.downloadZapret(tag)
       await refresh()
       if (!result.ok) setError(result.error || 'Не удалось скачать zapret')
     } catch (err) {
@@ -112,6 +141,7 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
     } finally {
       off()
       setBusy(false)
+      setDownloadPercent(null)
     }
   }, [refresh])
 
@@ -186,6 +216,9 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
       error,
       selected,
       setSelected: pick,
+      releases,
+      releaseTag,
+      setReleaseTag: pickRelease,
       refresh,
       download,
       start,
@@ -205,6 +238,9 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
       quickLaunch,
       refresh,
       pick,
+      pickRelease,
+      releaseTag,
+      releases,
       selected,
       start,
       state,
