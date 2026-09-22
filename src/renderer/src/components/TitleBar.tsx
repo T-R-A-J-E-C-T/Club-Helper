@@ -50,6 +50,24 @@ export function TitleBar({ tab, onTab }: TitleBarProps): React.JSX.Element {
       <div className="flex shrink-0 items-center gap-1">
         <button
           type="button"
+          aria-label="Настройки"
+          onClick={() => onTab('settings')}
+          className={`no-drag grid h-8 w-8 cursor-pointer place-items-center rounded-full ${
+            tab === 'settings' ? 'bg-accent text-accent-ink' : 'text-muted hover:bg-white/8 hover:text-ink'
+          }`}
+        >
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="2.1" stroke="currentColor" strokeWidth="1.4" />
+            <path
+              d="M8 1.7v1.7M8 12.6v1.7M1.7 8h1.7M12.6 8h1.7M3.5 3.5l1.2 1.2M11.3 11.3l1.2 1.2M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
           aria-label="Свернуть"
           onClick={() => window.api.minimize()}
           className="no-drag grid h-8 w-8 cursor-pointer place-items-center rounded-full text-muted hover:bg-white/8 hover:text-ink"

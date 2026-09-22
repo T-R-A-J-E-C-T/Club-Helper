@@ -99,8 +99,8 @@ export function ZapretScreen(): React.JSX.Element {
                   : 'Обход не активен на этом ПК'}
               </p>
             ) : null}
-            <div className="mt-auto pt-8">
-              <div className="flex items-center gap-2">
+            <div className="mt-auto flex flex-col gap-2 pt-8">
+              <div className="flex items-stretch gap-2">
                 <VersionMenu
                   tags={releases.map((item) => item.tag)}
                   value={releaseTag}
@@ -109,39 +109,28 @@ export function ZapretScreen(): React.JSX.Element {
                   light={running}
                   onChange={setReleaseTag}
                 />
-                {ready ? (
-                  <button
-                    type="button"
-                    disabled={busy || running || !releaseTag}
-                    onClick={() => void download(releaseTag)}
-                    className={`shrink-0 rounded-full px-4 py-2.5 text-[13px] font-semibold disabled:opacity-60 ${
-                      running ? 'bg-accent-ink text-accent' : 'bg-white/8 text-ink hover:bg-white/12'
-                    }`}
-                  >
-                    {busy && downloadPercent != null ? `${downloadPercent}%` : 'Установить'}
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  disabled={busy || (ready && (running || !releaseTag))}
+                  onClick={() => void download(releaseTag || undefined)}
+                  className={`h-11 shrink-0 rounded-2xl px-5 text-[13px] font-semibold disabled:opacity-60 ${
+                    ready
+                      ? running
+                        ? 'bg-accent-ink text-accent'
+                        : 'bg-white/8 text-ink hover:bg-white/12'
+                      : 'bg-accent text-accent-ink'
+                  }`}
+                >
+                  {busy && downloadPercent != null ? `${downloadPercent}%` : ready ? 'Установить' : 'Скачать'}
+                </button>
               </div>
-              <div className="mt-3">
-                {!ready ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void download(releaseTag || undefined)}
-                    className="rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-accent-ink disabled:opacity-60"
-                  >
-                    {busy
-                      ? downloadPercent != null
-                        ? `Скачиваем… ${downloadPercent}%`
-                        : 'Скачиваем…'
-                      : 'Скачать zapret'}
-                  </button>
-                ) : running ? (
+              {ready ? (
+                running ? (
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => void stop()}
-                    className="rounded-full bg-accent-ink px-5 py-2.5 text-[13px] font-semibold text-accent disabled:opacity-60"
+                    className="h-11 w-full rounded-2xl bg-accent-ink text-[13px] font-semibold text-accent disabled:opacity-60"
                   >
                     {busy && downloadPercent == null ? 'Выключаем…' : 'Выключить'}
                   </button>
@@ -150,12 +139,12 @@ export function ZapretScreen(): React.JSX.Element {
                     type="button"
                     disabled={busy || !selected}
                     onClick={() => void start()}
-                    className="rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-accent-ink disabled:opacity-60"
+                    className="h-11 w-full rounded-2xl bg-accent text-[13px] font-semibold text-accent-ink disabled:opacity-60"
                   >
                     {busy && downloadPercent == null ? 'Включаем…' : 'Включить обход'}
                   </button>
-                )}
-              </div>
+                )
+              ) : null}
             </div>
           </Card>
 
@@ -345,7 +334,7 @@ function VersionMenu({
           if (rect) setBox({ top: rect.bottom + 8, left: rect.left, width: Math.max(rect.width, 168) })
           setOpen((current) => !current)
         }}
-        className={`flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-[13px] disabled:opacity-60 ${
+        className={`flex h-11 w-full items-center gap-3 rounded-2xl px-4 text-left text-[13px] disabled:opacity-60 ${
           light ? 'bg-accent-ink/10 text-accent-ink' : 'bg-white/6 text-ink ring-1 ring-inset ring-white/8 hover:bg-white/10'
         }`}
       >

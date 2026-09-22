@@ -11,6 +11,8 @@ import type {
 const api: TrajectApi = {
   minimize: () => ipcRenderer.send('window:minimize'),
   close: () => ipcRenderer.send('window:close'),
+  getAppSettings: () => ipcRenderer.invoke('settings:get'),
+  setAppSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
   getNetworkInfo: () => ipcRenderer.invoke('diag:network'),
   ping: (target, count) => ipcRenderer.invoke('diag:ping', target, count),
   pingMany: (targets: PingTarget[], count?: number) =>

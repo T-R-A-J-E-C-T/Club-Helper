@@ -1,6 +1,11 @@
 export type HealthLevel = 'ok' | 'warn' | 'bad' | 'unknown' | 'pending'
 
-export type TabId = 'overview' | 'network' | 'ping' | 'audio' | 'system' | 'display' | 'zapret'
+export type TabId = 'overview' | 'network' | 'ping' | 'audio' | 'system' | 'display' | 'zapret' | 'settings'
+
+export interface AppSettings {
+  openAtLogin: boolean
+  startInTray: boolean
+}
 
 export interface NetworkInfo {
   hostname: string
@@ -210,6 +215,8 @@ export const PING_OVERVIEW_IDS = ['gateway', 'cloudflare', 'google', 'yandex'] a
 export interface TrajectApi {
   minimize: () => void
   close: () => void
+  getAppSettings: () => Promise<AppSettings>
+  setAppSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   getNetworkInfo: () => Promise<NetworkInfo>
   ping: (target: PingTarget, count?: number) => Promise<PingResult>
   pingMany: (targets: PingTarget[], count?: number) => Promise<PingResult[]>

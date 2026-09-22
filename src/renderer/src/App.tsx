@@ -12,6 +12,7 @@ import { AudioScreen } from '@renderer/screens/Audio'
 import { SystemScreen } from '@renderer/screens/System'
 import { DisplayScreen } from '@renderer/screens/Display'
 import { ZapretScreen } from '@renderer/screens/Zapret'
+import { SettingsScreen } from '@renderer/screens/Settings'
 
 const BOOT_MIN_MS = 520
 const BOOT_MAX_MS = 8000
@@ -104,6 +105,9 @@ function Shell(): React.JSX.Element {
         </Pane>
         <Pane show={tab === 'zapret'}>
           <ZapretScreen />
+        </Pane>
+        <Pane show={tab === 'settings'}>
+          <SettingsScreen />
         </Pane>
         {tab === 'audio' ? <AudioScreen /> : null}
       </main>

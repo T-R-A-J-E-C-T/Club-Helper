@@ -1,15 +1,54 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, session, shell, Tray } from 'electron'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.ico?asset'
-import type { PingTarget } from '@shared/types'
+import type { AppSettings, PingTarget } from '@shared/types'
 import { getNetworkInfo, getSystemInfo, getSystemLive, pingMany, pingTarget, runSpeedTest } from './diagnostics'
 import { downloadZapret, getZapretState, listZapretReleases, setZapretGameFilter, startZapret, stopZapret, uninstallZapret, zapretRoot } from './zapret'
 import { calibrateMonitors, listMonitors } from './monitor'
+import { applyOpenAtLogin, mergeAppSettings, readAppSettings, writeAppSettings } from './settings'
 
 const WINDOW_WIDTH = 1280
 const WINDOW_HEIGHT = 800
+
+let launchSettings: AppSettings = { openAtLogin: false, startInTray: false }
+let tray: Tray | null = null
+let quitting = false
+
+function showMainWindow(): void {
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  if (!mainWindow) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.setSkipTaskbar(false)
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function syncTray(enabled: boolean): void {
+  if (!enabled) {
+    tray?.destroy()
+    tray = null
+    return
+  }
+  if (tray) return
+  tray = new Tray(nativeImage.createFromPath(icon))
+  tray.setToolTip('Traject Club Helper')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Открыть', click: () => showMainWindow() },
+      { type: 'separator' },
+      {
+        label: 'Выход',
+        click: () => {
+          quitting = true
+          app.quit()
+        }
+      }
+    ])
+  )
+  tray.on('click', () => showMainWindow())
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -25,6 +64,7 @@ function createWindow(): void {
     frame: false,
     autoHideMenuBar: true,
     show: false,
+    skipTaskbar: launchSettings.startInTray,
     backgroundColor: '#16140f',
     icon,
     webPreferences: {
@@ -36,7 +76,14 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    if (!launchSettings.startInTray) mainWindow.show()
+  })
+
+  mainWindow.on('close', (event) => {
+    if (quitting || !launchSettings.startInTray) return
+    event.preventDefault()
+    mainWindow.setSkipTaskbar(true)
+    mainWindow.hide()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -51,8 +98,22 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+const hasInstanceLock = !app.isPackaged || app.requestSingleInstanceLock()
+if (!hasInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => showMainWindow())
+}
+
+app.on('before-quit', () => {
+  quitting = true
+})
+
+if (hasInstanceLock) app.whenReady().then(async () => {
   electronApp.setAppUserModelId('ru.traject.clubhelper')
+  launchSettings = await readAppSettings()
+  applyOpenAtLogin(launchSettings.openAtLogin)
+  syncTray(launchSettings.startInTray)
 
   session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
     callback(permission === 'media')
@@ -102,15 +163,26 @@ app.whenReady().then(() => {
     const error = await shell.openPath(root)
     return error ? { ok: false, error } : { ok: true }
   })
+  ipcMain.handle('settings:get', () => launchSettings)
+  ipcMain.handle('settings:set', async (_event, patch: Partial<AppSettings>) => {
+    launchSettings = mergeAppSettings(launchSettings, patch)
+    await writeAppSettings(launchSettings)
+    applyOpenAtLogin(launchSettings.openAtLogin)
+    syncTray(launchSettings.startInTray)
+    if (!launchSettings.startInTray) showMainWindow()
+    return launchSettings
+  })
 
   createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    else showMainWindow()
   })
 })
 
 app.on('window-all-closed', () => {
+  if (launchSettings.startInTray) return
   if (process.platform !== 'darwin') {
     app.quit()
   }
