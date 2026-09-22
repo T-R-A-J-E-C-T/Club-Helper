@@ -445,24 +445,29 @@ function Monitor-HasLevels($found) {
 }
 
 $script:hdrOff = @()
-try { $script:hdrOff = @(Disable-Hdr '') } catch { $script:hdrOff = @() }
-
 $settled = @()
-for ($try = 0; $try -lt 10; $try++) {
-  if ($try -gt 0) { Start-Sleep -Milliseconds 500 }
+if ($action -eq 'mode') {
   Find-Monitors
-  $found = $script:foundList
-  if ($null -eq $found -or $found.Count -eq 0) { continue }
-  $ready = Monitor-HasLevels $found
-  if ($ready -or $try -eq 9) {
-    Release-Found $settled
-    $settled = $found
-    break
+  if ($null -ne $script:foundList) { $settled = $script:foundList }
+} else {
+  try { $script:hdrOff = @(Disable-Hdr '') } catch { $script:hdrOff = @() }
+  for ($try = 0; $try -lt 10; $try++) {
+    if ($try -gt 0) { Start-Sleep -Milliseconds 500 }
+    Find-Monitors
+    $found = $script:foundList
+    if ($null -eq $found -or $found.Count -eq 0) { continue }
+    $ready = Monitor-HasLevels $found
+    if ($ready -or $try -eq 9) {
+      Release-Found $settled
+      $settled = $found
+      break
+    }
+    Release-Found $found
   }
-  Release-Found $found
 }
 
-$wmiBrightness = Get-WmiBrightnessMap
+$wmiBrightness = @{}
+if ($action -ne 'mode') { $wmiBrightness = Get-WmiBrightnessMap }
 $items = @()
 foreach ($monitor in $settled) {
   $refresh = Get-Refresh $monitor.device ($action -eq 'calibrate')
@@ -473,6 +478,7 @@ foreach ($monitor in $settled) {
   $steps = @()
   $note = $null
   $pictureOk = $false
+  $modeCode = $null
   $handle = [IntPtr]::Zero
   if ($null -ne $monitor.bag -and [int64]$monitor.bag.Handle -ne 0) {
     $handle = [IntPtr]$monitor.bag.Handle
@@ -488,7 +494,7 @@ foreach ($monitor in $settled) {
     $steps += @{ label = "$($refresh.max) Гц"; ok = [bool]$refresh.applied }
   }
 
-  if ($handle -ne [IntPtr]::Zero) {
+  if ($handle -ne [IntPtr]::Zero -and $action -ne 'mode') {
     $caps = ''
     try { $caps = Get-Caps $handle } catch { $caps = '' }
     $supports = { param($code) $caps -match "(^|[^0-9A-Fa-f])$code([^0-9A-Fa-f]|$)" }
@@ -530,6 +536,11 @@ foreach ($monitor in $settled) {
     $steps += @{ label = 'Картинка'; ok = $false }
   }
 
+  if ($handle -ne [IntPtr]::Zero) {
+    $picture = Read-Vcp $handle 0xDC
+    if ($picture) { $modeCode = [int]$picture.current }
+  }
+
   if ($null -eq $brightness) {
     $key = Get-MonitorKey $monitor.device
     if ($key -and $wmiBrightness.ContainsKey($key)) { $brightness = $wmiBrightness[$key] }
@@ -547,7 +558,8 @@ foreach ($monitor in $settled) {
     maxRefreshRate = $refresh.max
     brightness = $brightness
     contrast = $contrast
-    ok = $(if ($action -eq 'list') { $true } else { @($steps | Where-Object { -not $_.ok }).Count -eq 0 })
+    modeCode = $modeCode
+    ok = $(if ($action -eq 'list' -or $action -eq 'mode') { $true } else { @($steps | Where-Object { -not $_.ok }).Count -eq 0 })
     note = $note
     steps = @($steps | ForEach-Object { [pscustomobject]$_ })
   }

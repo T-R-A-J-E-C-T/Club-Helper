@@ -124,6 +124,7 @@ export interface MonitorView {
   maxRefreshRate: number | null
   brightness: number | null
   contrast: number | null
+  modeCode: number | null
   ok: boolean
   note: string | null
   steps: MonitorStep[]
@@ -218,6 +219,7 @@ export interface TrajectApi {
   getSystemInfo: () => Promise<SystemInfo>
   getSystemLive: () => Promise<SystemLive>
   getMonitors: () => Promise<MonitorView[]>
+  readMonitorModes: () => Promise<MonitorView[]>
   calibrateMonitors: () => Promise<MonitorView[]>
   getZapretState: () => Promise<ZapretState>
   downloadZapret: () => Promise<ZapretActionResult>
