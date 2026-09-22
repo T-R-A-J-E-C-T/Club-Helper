@@ -241,8 +241,10 @@ function Get-Caps([IntPtr]$handle) {
 }
 
 function Get-FpsCode([string]$caps) {
-  # ASUS lists GameVisual codes out of menu order. 0x04 is Racing on VG279, 0x13 is FPS.
-  return 0x13
+  # VG279QM1A GameVisual, read live in OSD order:
+  # 02 Scenery, 05 Racing, 01 Cinema, 06 RTS/RPG, 07 FPS, 03 sRGB, 08 MOBA.
+  # Night View also reads back as 05, same as Racing. 0x13 was rejected.
+  return 0x07
 }
 
 function Wait-PictureStable([IntPtr]$handle) {
