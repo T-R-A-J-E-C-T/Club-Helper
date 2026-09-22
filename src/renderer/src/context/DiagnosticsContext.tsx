@@ -269,6 +269,8 @@ export function DiagnosticsProvider({ children }: { children: ReactNode }): Reac
     void refreshAll()
   }, [refreshAll])
 
+  useEffect(() => window.api.onMonitorsRefresh(() => void refreshMonitors()), [refreshMonitors])
+
   useEffect(() => {
     let cancelled = false
     let busy = false

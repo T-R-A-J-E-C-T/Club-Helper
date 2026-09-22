@@ -51,6 +51,20 @@ const api: TrajectApi = {
     return () => {
       ipcRenderer.removeListener('zapret:download-progress', listener)
     }
+  },
+  onZapretRefresh: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('zapret:refresh', listener)
+    return () => {
+      ipcRenderer.removeListener('zapret:refresh', listener)
+    }
+  },
+  onMonitorsRefresh: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('monitor:refresh', listener)
+    return () => {
+      ipcRenderer.removeListener('monitor:refresh', listener)
+    }
   }
 }
 

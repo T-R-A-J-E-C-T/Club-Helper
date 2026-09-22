@@ -85,7 +85,13 @@ export function ZapretProvider({ children }: { children: ReactNode }): React.JSX
     const timer = window.setInterval(() => {
       void refresh()
     }, 3000)
-    return () => window.clearInterval(timer)
+    const off = window.api.onZapretRefresh(() => {
+      void refresh()
+    })
+    return () => {
+      window.clearInterval(timer)
+      off()
+    }
   }, [refresh])
 
   useEffect(() => {

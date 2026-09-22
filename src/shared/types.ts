@@ -238,6 +238,8 @@ export interface TrajectApi {
   setZapretGameFilter: (enabled: boolean) => Promise<ZapretActionResult>
   revealZapretFolder: () => Promise<ZapretActionResult>
   onZapretDownloadProgress: (callback: (progress: ZapretDownloadProgress) => void) => () => void
+  onZapretRefresh: (callback: () => void) => () => void
+  onMonitorsRefresh: (callback: () => void) => () => void
 }
 
 export interface ZapretDownloadProgress {
