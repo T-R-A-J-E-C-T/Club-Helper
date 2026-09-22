@@ -13,7 +13,7 @@ import { applyOpenAtLogin, mergeAppSettings, readAppSettings, writeAppSettings }
 const WINDOW_WIDTH = 1280
 const WINDOW_HEIGHT = 800
 
-let launchSettings: AppSettings = { openAtLogin: false, startInTray: false, openDiscord: false }
+let launchSettings: AppSettings = { openAtLogin: true, startInTray: true, openDiscord: true }
 let tray: Tray | null = null
 let quitting = false
 

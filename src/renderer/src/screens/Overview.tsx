@@ -1,9 +1,8 @@
-import type { TabId } from '@shared/types'
 import { Kicker, Skeleton } from '@renderer/components/Card'
 import { useDiagnostics } from '@renderer/context/DiagnosticsContext'
 import { bytes, gib, ghz, ifaceType, ms, uptime } from '@renderer/lib/format'
 
-export function Overview({ onOpen }: { onOpen: (tab: TabId) => void }): React.JSX.Element {
+export function Overview(): React.JSX.Element {
   const { network, system, pings, speed, runSpeedTest } = useDiagnostics()
 
   const pingValues = ['cloudflare', 'google', 'yandex']
@@ -34,22 +33,14 @@ export function Overview({ onOpen }: { onOpen: (tab: TabId) => void }): React.JS
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => onOpen('ping')}
-        className="pointer-events-auto absolute top-[38%] left-[12%] rounded-full bg-page/55 px-3.5 py-2 text-[12px] backdrop-blur-md ring-1 ring-white/8"
-      >
+      <div className="pointer-events-none absolute top-[38%] left-[12%] rounded-full bg-page/55 px-3.5 py-2 text-[12px] backdrop-blur-md ring-1 ring-white/8">
         <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-accent" />
         Пинг {pingAvg !== null ? ms(pingAvg) : '—'}
-      </button>
-      <button
-        type="button"
-        onClick={() => onOpen('network')}
-        className="pointer-events-auto absolute top-[44%] right-[14%] rounded-full bg-page/55 px-3.5 py-2 text-[12px] backdrop-blur-md ring-1 ring-white/8"
-      >
+      </div>
+      <div className="pointer-events-none absolute top-[44%] right-[14%] rounded-full bg-page/55 px-3.5 py-2 text-[12px] backdrop-blur-md ring-1 ring-white/8">
         <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-accent" />
         {network?.externalIp ?? network?.ipv4 ?? 'нет IP'}
-      </button>
+      </div>
       <div className="pointer-events-auto absolute inset-x-0 bottom-0 grid grid-cols-2 gap-4">
         <article className="rounded-[28px] bg-surface/72 p-6 ring-1 ring-white/8 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-3">
@@ -84,10 +75,7 @@ export function Overview({ onOpen }: { onOpen: (tab: TabId) => void }): React.JS
           </div>
         </article>
 
-        <article
-          className="cursor-pointer rounded-[28px] bg-surface/72 p-6 ring-1 ring-white/8 backdrop-blur-xl transition-transform hover:-translate-y-0.5"
-          onClick={() => onOpen('system')}
-        >
+        <article className="rounded-[28px] bg-surface/72 p-6 ring-1 ring-white/8 backdrop-blur-xl">
           {system ? (
             <>
               <div className="flex items-start justify-between gap-3">

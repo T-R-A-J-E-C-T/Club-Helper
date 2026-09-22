@@ -83,9 +83,15 @@ export function ZapretScreen(): React.JSX.Element {
         }
       />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] gap-4">
-        <div className="flex min-h-0 flex-col gap-4">
-          <Card accent={running} className="flex min-h-0 flex-[1.35] flex-col">
+      <div
+        className={
+          ready
+            ? 'grid min-h-0 flex-1 grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] gap-4'
+            : 'flex min-h-0 flex-1'
+        }
+      >
+        <div className={`flex min-h-0 flex-col gap-4 ${ready ? '' : 'flex-1'}`}>
+          <Card accent={running} className={`flex min-h-0 flex-col ${ready ? 'flex-[1.35]' : 'flex-1'}`}>
             <Kicker accent={running}>Статус</Kicker>
             <p className="mt-6 text-[44px] leading-none font-semibold tracking-tight">
               {running ? 'Включён' : ready ? 'Выключен' : 'Не установлен'}
@@ -146,24 +152,32 @@ export function ZapretScreen(): React.JSX.Element {
                 )
               ) : null}
             </div>
+            {error ? <p className={`mt-4 text-sm ${running ? 'text-accent-ink' : 'text-bad'}`}>{error}</p> : null}
           </Card>
 
+          {ready ? (
           <Card className="flex-1">
-            <div className="flex h-full items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <Kicker>Режим</Kicker>
                 <p className="mt-3 text-[22px] font-semibold tracking-tight">Игровой фильтр</p>
               </div>
               <Toggle
                 on={Boolean(state?.gameFilter)}
-                disabled={!ready || busy}
+                disabled={busy}
                 onChange={(value) => void toggleGameFilter(value)}
               />
             </div>
-            {error ? <p className="mt-4 text-sm text-bad">{error}</p> : null}
+            <p className="mt-4 w-full text-justify text-[15px] leading-relaxed text-muted">
+              Обход обрабатывает сайты из списков: Discord, YouTube и другие. Фильтр добавляет к ним игровые порты.
+              Включайте, если игра не подключается к серверу. Выключайте, если из‑за фильтра она лагает, теряет пакеты
+              или не находит сервер.
+            </p>
           </Card>
+          ) : null}
         </div>
 
+        {ready ? (
         <Card className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex items-end justify-between gap-4">
             <div>
@@ -278,6 +292,7 @@ export function ZapretScreen(): React.JSX.Element {
             ) : null}
           </div>
         </Card>
+        ) : null}
       </div>
     </div>
   )

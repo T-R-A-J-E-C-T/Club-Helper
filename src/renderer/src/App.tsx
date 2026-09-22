@@ -89,7 +89,7 @@ function Shell(): React.JSX.Element {
         }`}
       >
         <Pane show={tab === 'overview'}>
-          <Overview onOpen={setTab} />
+          <Overview />
         </Pane>
         <Pane show={tab === 'network'}>
           <NetworkScreen />

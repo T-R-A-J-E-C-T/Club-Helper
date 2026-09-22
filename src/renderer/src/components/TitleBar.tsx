@@ -47,7 +47,7 @@ export function TitleBar({ tab, onTab }: TitleBarProps): React.JSX.Element {
         })}
       </nav>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-7">
         <button
           type="button"
           aria-label="Настройки"
@@ -56,16 +56,14 @@ export function TitleBar({ tab, onTab }: TitleBarProps): React.JSX.Element {
             tab === 'settings' ? 'bg-accent text-accent-ink' : 'text-muted hover:bg-white/8 hover:text-ink'
           }`}
         >
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="2.1" stroke="currentColor" strokeWidth="1.4" />
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
             <path
-              d="M8 1.7v1.7M8 12.6v1.7M1.7 8h1.7M12.6 8h1.7M3.5 3.5l1.2 1.2M11.3 11.3l1.2 1.2M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
+              fillRule="evenodd"
+              d="M9.7 2.4h4.6l.5 2.2c.7.25 1.35.64 1.9 1.12l2.05-.85 2.3 4-1.55 1.55c.1.5.15 1.02.15 1.55s-.05 1.05-.15 1.55l1.55 1.55-2.3 4-2.05-.85c-.55.48-1.2.87-1.9 1.12l-.5 2.2H9.7l-.5-2.2a6.9 6.9 0 0 1-1.9-1.12l-2.05.85-2.3-4 1.55-1.55a7.6 7.6 0 0 1 0-3.1L2.95 8.87l2.3-4 2.05.85c.55-.48 1.2-.87 1.9-1.12l.5-2.2ZM12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z"
             />
           </svg>
         </button>
+        <div className="flex items-center gap-1">
         <button
           type="button"
           aria-label="Свернуть"
@@ -91,6 +89,7 @@ export function TitleBar({ tab, onTab }: TitleBarProps): React.JSX.Element {
             />
           </svg>
         </button>
+        </div>
       </div>
     </header>
   )

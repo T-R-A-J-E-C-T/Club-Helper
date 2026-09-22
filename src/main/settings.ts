@@ -4,9 +4,9 @@ import { dirname, join } from 'node:path'
 import type { AppSettings } from '@shared/types'
 
 const DEFAULTS: AppSettings = {
-  openAtLogin: false,
-  startInTray: false,
-  openDiscord: false
+  openAtLogin: true,
+  startInTray: true,
+  openDiscord: true
 }
 
 function settingsFile(): string {
